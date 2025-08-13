@@ -1,11 +1,11 @@
 {
   "files": {
-    "main.css": "/static/css/main.84cbbb45.css",
-    "main.js": "/static/js/main.1bf8b1d7.js",
+    "main.css": "/static/css/main.ef4d2cab.css",
+    "main.js": "/static/js/main.75e1ef65.js",
     "static/js/787.c4e7f8f9.chunk.js": "/static/js/787.c4e7f8f9.chunk.js",
-    "static/media/profile.png": "/static/media/profile.de6e8a5631d09d5e14d6.png",
     "static/media/ecommerce.jpg": "/static/media/ecommerce.ae7522135549ef08af4c.jpg",
     "static/media/MobileApp.jpg": "/static/media/MobileApp.1879d49c2bae0e99e3a8.jpg",
+    "static/media/profile.png": "/static/media/profile.648b26232b0b017438d7.png",
     "static/media/WebApp.jpg": "/static/media/WebApp.ef3338e2c14af34bf7f3.jpg",
     "static/media/identity.jpg": "/static/media/identity.d9f44494b40c0e6c9dfa.jpg",
     "static/media/upwork.png": "/static/media/upwork.bacbcde66780bc39a27d.png",
@@ -15,12 +15,12 @@
     "static/media/git.png": "/static/media/git.a54d3fa44e02f2f61e69.png",
     "index.html": "/index.html",
     "static/media/circle.svg": "/static/media/circle.134eeeb1e58895b892195fe8ed63bc9f.svg",
-    "main.84cbbb45.css.map": "/static/css/main.84cbbb45.css.map",
-    "main.1bf8b1d7.js.map": "/static/js/main.1bf8b1d7.js.map",
+    "main.ef4d2cab.css.map": "/static/css/main.ef4d2cab.css.map",
+    "main.75e1ef65.js.map": "/static/js/main.75e1ef65.js.map",
     "787.c4e7f8f9.chunk.js.map": "/static/js/787.c4e7f8f9.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.84cbbb45.css",
-    "static/js/main.1bf8b1d7.js"
+    "static/css/main.ef4d2cab.css",
+    "static/js/main.75e1ef65.js"
   ]
 }
