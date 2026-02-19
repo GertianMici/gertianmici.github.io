@@ -55,9 +55,59 @@
   #startBtn {
     padding: 14px 40px; font-size: 20px; background: #e94560; color: #fff;
     border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s;
+    touch-action: manipulation;
   }
   #startBtn:hover { background: #c73652; }
   .controls-hint { font-size: 14px; color: #888; margin-top: 15px; }
+
+  /* ── Mobile Controls ── */
+  #mobileControls {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 15;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #mobileControls.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .mobile-btn {
+    width: 80px;
+    height: 80px;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.35);
+    border-radius: 50%;
+    color: #fff;
+    font-size: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    transition: background 0.1s;
+  }
+  .mobile-btn:active { background: rgba(255,255,255,0.35); }
+  /* Hide on desktop (mouse pointer) */
+  @media (hover: hover) and (pointer: fine) {
+    #mobileControls { display: none !important; }
+  }
+  /* Smaller HUD on compact screens */
+  @media (max-width: 480px) {
+    #hud { font-size: 14px; top: 8px; left: 10px; right: 10px; }
+    #overlay h1 { font-size: 36px; }
+    #overlay h2 { font-size: 22px; }
+    #overlay p { font-size: 15px; }
+    .mobile-btn { width: 70px; height: 70px; font-size: 26px; }
+  }
 </style>
 </head>
 <body>
@@ -75,6 +125,10 @@
     <div class="score-display hidden" id="finalScore"></div>
     <button id="startBtn">Start Race</button>
     <div class="controls-hint">Left / Right arrows or A / D to steer</div>
+  </div>
+  <div id="mobileControls">
+    <button class="mobile-btn" id="leftBtn" aria-label="Steer left">&#9664;</button>
+    <button class="mobile-btn" id="rightBtn" aria-label="Steer right">&#9654;</button>
   </div>
 </div>
 
@@ -775,6 +829,7 @@ function update() {
 
 function gameOver() {
   gameState = 'dying';
+  document.getElementById('mobileControls').classList.remove('visible');
   playerCar.visible = false;
   stopEngine();
   playCrash();
@@ -803,6 +858,7 @@ function startGame() {
   overlayEl.classList.add('hidden');
   finalScoreEl.classList.add('hidden');
   startEngine();
+  document.getElementById('mobileControls').classList.add('visible');
 }
 
 // ── Render loop ──
@@ -832,6 +888,31 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 startBtn.addEventListener('click', startGame);
+
+// ── Mobile touch controls ──
+(function() {
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+
+  function setupMobileBtn(btn, keyCode) {
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      keys[keyCode] = true;
+      btn.setPointerCapture(e.pointerId);
+    });
+    btn.addEventListener('pointerup', () => { keys[keyCode] = false; });
+    btn.addEventListener('pointercancel', () => { keys[keyCode] = false; });
+    btn.addEventListener('pointerleave', () => { keys[keyCode] = false; });
+  }
+
+  setupMobileBtn(leftBtn, 'ArrowLeft');
+  setupMobileBtn(rightBtn, 'ArrowRight');
+
+  // Show touch hint on touch devices
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    document.querySelector('.controls-hint').textContent = 'Tap and hold the arrows to steer';
+  }
+})();
 
 // ── Handle resize ──
 window.addEventListener('resize', () => {

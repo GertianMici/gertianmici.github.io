@@ -96,6 +96,7 @@
     font-size: 13px;
     color: #ccc;
     transition: all 0.15s;
+    touch-action: manipulation;
   }
   .llama-option:hover { border-color: #555; background: #153a6e; }
   .llama-option.selected { border-color: #d4a017; background: #1a4a7a; color: #fff; }
@@ -122,6 +123,7 @@
     font-size: 14px;
     width: 100%;
     transition: background 0.15s;
+    touch-action: manipulation;
   }
   #placeBetBtn:hover { background: #e8b830; }
   #placeBetBtn:disabled { background: #555; color: #888; cursor: not-allowed; }
@@ -207,6 +209,7 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
+    touch-action: manipulation;
   }
   #startRaceBtn { background: #4ade80; color: #000; }
   #startRaceBtn:hover { background: #22c55e; }
@@ -251,6 +254,55 @@
   #finishOverlay.show { display: flex; }
   #finishOverlay h2 { font-size: 42px; color: #d4a017; margin-bottom: 10px; }
   #finishOverlay .winner-name { font-size: 28px; margin-bottom: 20px; }
+
+  /* ── Mobile Responsive ── */
+  @media (max-width: 768px) {
+    #main {
+      flex-direction: column;
+    }
+    /* Race track on top, betting panel below */
+    #raceArea {
+      order: 1;
+      flex: 1;
+      min-height: 0;
+    }
+    #bettingPanel {
+      order: 2;
+      width: 100%;
+      height: 45vh;
+      max-height: 45vh;
+      overflow-y: auto;
+      border-right: none;
+      border-top: 2px solid #333;
+      flex-shrink: 0;
+    }
+    /* Flatten inner scroll contexts so outer panel scrolls */
+    #betsList { overflow-y: visible; flex: 0 0 auto; }
+    #resultsPanel { max-height: none; overflow-y: visible; }
+    /* Compact top bar */
+    #topBar h1 { font-size: 18px; }
+    #raceStatus { font-size: 14px; }
+    /* Hide legend — lane numbers on track are enough */
+    #llamaLegend { display: none; }
+    /* Race control buttons */
+    .race-btn { padding: 10px 18px; font-size: 14px; }
+    #raceControls { bottom: 8px; gap: 8px; }
+    /* Finish overlay */
+    #finishOverlay h2 { font-size: 28px; }
+    #finishOverlay .winner-name { font-size: 20px; }
+  }
+
+  @media (max-width: 480px) {
+    #topBar { padding: 6px 12px; }
+    #topBar h1 { font-size: 15px; }
+    #raceStatus { font-size: 12px; }
+    #bettingPanel h2 { font-size: 14px; padding: 8px 12px; }
+    #betForm { padding: 8px 12px; }
+    #betForm label { margin-top: 8px; }
+    .bet-entry { font-size: 12px; padding: 5px 8px; }
+    .llama-option { font-size: 12px; padding: 5px 8px; }
+    .race-btn { padding: 8px 14px; font-size: 13px; }
+  }
 </style>
 </head>
 <body>
