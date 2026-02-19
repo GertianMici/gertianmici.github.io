@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horse Racer 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }
+  #gameContainer {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+  #hud {
+    position: absolute;
+    top: 15px; left: 20px; right: 20px;
+    display: flex;
+    justify-content: space-between;
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    text-shadow: 2px 2px 6px rgba(0,0,0,0.9);
+    pointer-events: none;
+    z-index: 10;
+  }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    z-index: 20;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 { font-size: 52px; color: #d4a017; margin-bottom: 10px; }
+  #overlay h2 { font-size: 28px; margin-bottom: 5px; }
+  #overlay p { font-size: 18px; color: #ccc; margin-bottom: 20px; }
+  #overlay .score-display {
+    font-size: 36px; color: #fff; background: #d4a017;
+    padding: 10px 30px; border-radius: 8px; margin-bottom: 20px;
+  }
+  #startBtn {
+    padding: 14px 40px; font-size: 20px; background: #d4a017; color: #fff;
+    border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s;
+  }
+  #startBtn:hover { background: #b8860b; }
+  .controls-hint { font-size: 14px; color: #888; margin-top: 15px; }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <div id="hud">
+    <span id="scoreDisplay">Score: 0</span>
+    <span id="speedDisplay">Gallop: Trot</span>
+    <span id="highScoreDisplay">Best: 0</span>
+  </div>
+  <div id="overlay">
+    <h1>Horse Racer 3D</h1>
+    <h2 id="overlayTitle">Ready to ride?</h2>
+    <p id="overlayMsg">Dodge the pack and race to victory!</p>
+    <div class="score-display hidden" id="finalScore"></div>
+    <button id="startBtn">Start Race</button>
+    <div class="controls-hint">Left / Right arrows or A / D to steer</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ── DOM ──
+const container = document.getElementById('gameContainer');
+const overlayEl = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+const scoreEl = document.getElementById('scoreDisplay');
+const speedEl = document.getElementById('speedDisplay');
+const highScoreEl = document.getElementById('highScoreDisplay');
+const overlayTitle = document.getElementById('overlayTitle');
+const overlayMsg = document.getElementById('overlayMsg');
+const finalScoreEl = document.getElementById('finalScore');
+
+// ── Constants ──
+const TRACK_WIDTH = 14;
+const LANE_COUNT = 5;
+const LANE_WIDTH = TRACK_WIDTH / LANE_COUNT;
+const TRACK_LENGTH = 600;
+const SEGMENT_LENGTH = 12;
+const NUM_SEGMENTS = Math.ceil(TRACK_LENGTH / SEGMENT_LENGTH);
+const TREE_SPACING = 10;
+const NUM_TREES_PER_SIDE = Math.ceil(TRACK_LENGTH / TREE_SPACING);
+const JOCKEY_COLORS = [0xe94560, 0xff6b35, 0xffd166, 0x06d6a0, 0x118ab2, 0x8338ec, 0xff69b4, 0x00ff7f];
+
+// ── State ──
+let gameState = 'menu';
+let score = 0;
+let scoreFrac = 0;
+let highScore = parseInt(localStorage.getItem('horseRacingHighScore') || '0');
+let speed = 0;
+let maxSpeed = 100;
+let frameCount = 0;
+let playerVx = 0;
+let enemies = [];
+let crashParticles = [];
+let gallopTime = 0;
+let clock;
+let keys = {};
+
+highScoreEl.textContent = `Best: ${highScore}`;
+
+// ── Audio ──
+let audioCtx = null;
+let gallopInterval = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playHoofbeat() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+
+  // Two quick clicks per beat (clip-clop)
+  for (let i = 0; i < 2; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'square';
+    osc.frequency.value = 180 + i * 60 + Math.random() * 40;
+
+    filter.type = 'bandpass';
+    filter.frequency.value = 400 + Math.random() * 200;
+    filter.Q.value = 8;
+
+    gain.gain.setValueAtTime(0.08, t + i * 0.07);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.06);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.07);
+    osc.stop(t + i * 0.07 + 0.06);
+  }
+}
+
+function startGallop() {
+  if (gallopInterval) return;
+  gallopInterval = setInterval(() => {
+    if (gameState !== 'playing') return;
+    playHoofbeat();
+  }, 280);
+}
+
+function updateGallopRate() {
+  if (!gallopInterval) return;
+  const ratio = Math.min(speed / maxSpeed, 1);
+  const interval = Math.max(120, 300 - ratio * 180);
+  clearInterval(gallopInterval);
+  gallopInterval = setInterval(() => {
+    if (gameState !== 'playing') return;
+    playHoofbeat();
+  }, interval);
+}
+
+function stopGallop() {
+  if (gallopInterval) {
+    clearInterval(gallopInterval);
+    gallopInterval = null;
+  }
+}
+
+function playCrowdCheer() {
+  if (!audioCtx) return;
+  const bufferSize = audioCtx.sampleRate * 0.3;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    const env = Math.sin(Math.PI * i / bufferSize);
+    data[i] = (Math.random() * 2 - 1) * env * 0.2;
+  }
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 1500 + Math.random() * 500;
+  filter.Q.value = 1;
+
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0.15;
+
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  noise.start();
+}
+
+function playFall() {
+  if (!audioCtx) return;
+  const bufferSize = audioCtx.sampleRate * 0.5;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+  }
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0.3;
+  gain.gain.setTargetAtTime(0, audioCtx.currentTime + 0.1, 0.15);
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 600;
+
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  noise.start();
+
+  // Neigh sound
+  const osc = audioCtx.createOscillator();
+  const oscGain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.4);
+  oscGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+  osc.connect(oscGain);
+  oscGain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.5);
+}
+
+// ── Three.js Setup ──
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+container.insertBefore(renderer.domElement, container.firstChild);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 120, 300);
+
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 4, 10);
+camera.lookAt(0, 1, -20);
+
+// ── Lighting ──
+const ambientLight = new THREE.AmbientLight(0x8899bb, 0.7);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xffeedd, 1.5);
+sunLight.position.set(30, 50, 20);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 200;
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+scene.add(sunLight);
+
+const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x556b2f, 0.5);
+scene.add(hemiLight);
+
+// ── Ground ──
+const groundGeo = new THREE.PlaneGeometry(400, TRACK_LENGTH + 200);
+const groundMat = new THREE.MeshLambertMaterial({ color: 0x4a8c3f });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(0, -0.05, -TRACK_LENGTH / 2);
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ── Track ──
+const trackGroup = new THREE.Group();
+scene.add(trackGroup);
+
+const trackSegments = [];
+const trackMat1 = new THREE.MeshLambertMaterial({ color: 0x8B7355 });
+const trackMat2 = new THREE.MeshLambertMaterial({ color: 0x7D6744 });
+
+for (let i = 0; i < NUM_SEGMENTS; i++) {
+  const segGroup = new THREE.Group();
+  const isAlt = i % 2 === 0;
+
+  // Dirt surface
+  const trackGeo = new THREE.PlaneGeometry(TRACK_WIDTH, SEGMENT_LENGTH);
+  const track = new THREE.Mesh(trackGeo, isAlt ? trackMat1 : trackMat2);
+  track.rotation.x = -Math.PI / 2;
+  track.position.y = 0.01;
+  track.receiveShadow = true;
+  segGroup.add(track);
+
+  segGroup.position.z = -i * SEGMENT_LENGTH;
+  trackGroup.add(segGroup);
+  trackSegments.push(segGroup);
+}
+
+// ── Rail Fences ──
+const fencePosts = [];
+const postGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.2, 6);
+const postMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+const railGeo = new THREE.BoxGeometry(0.05, 0.06, 3);
+const railMat = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
+
+const FENCE_SPACING = 3;
+const NUM_FENCE_POSTS = Math.ceil(TRACK_LENGTH / FENCE_SPACING);
+
+for (let side = -1; side <= 1; side += 2) {
+  const x = side * (TRACK_WIDTH / 2 + 0.5);
+  for (let i = 0; i < NUM_FENCE_POSTS; i++) {
+    const postGroup = new THREE.Group();
+
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(x, 0.6, 0);
+    post.castShadow = true;
+    postGroup.add(post);
+
+    // Two horizontal rails
+    const rail1 = new THREE.Mesh(railGeo, railMat);
+    rail1.position.set(x, 0.9, 0);
+    postGroup.add(rail1);
+
+    const rail2 = new THREE.Mesh(railGeo, railMat);
+    rail2.position.set(x, 0.45, 0);
+    postGroup.add(rail2);
+
+    postGroup.position.z = -i * FENCE_SPACING;
+    scene.add(postGroup);
+    fencePosts.push({ group: postGroup, side });
+  }
+}
+
+// ── Trees & Hay Bales ──
+const sceneryGroup = new THREE.Group();
+scene.add(sceneryGroup);
+
+function createTree() {
+  const group = new THREE.Group();
+  const trunkGeo = new THREE.CylinderGeometry(0.15, 0.22, 1.8, 6);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4423 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 0.9;
+  trunk.castShadow = true;
+  group.add(trunk);
+
+  const foliageColors = [0x228b22, 0x2d8a2d, 0x3da63d];
+  const layers = [
+    { r: 1.8, h: 2.2, y: 2.8 },
+    { r: 1.3, h: 2.0, y: 3.8 },
+    { r: 0.8, h: 1.6, y: 4.6 }
+  ];
+  layers.forEach((l, idx) => {
+    const coneGeo = new THREE.ConeGeometry(l.r, l.h, 7);
+    const coneMat = new THREE.MeshLambertMaterial({ color: foliageColors[idx] });
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    cone.position.y = l.y;
+    cone.castShadow = true;
+    group.add(cone);
+  });
+  return group;
+}
+
+function createHayBale() {
+  const group = new THREE.Group();
+  const baleGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.8, 12);
+  const baleMat = new THREE.MeshLambertMaterial({ color: 0xdaa520 });
+  const bale = new THREE.Mesh(baleGeo, baleMat);
+  bale.rotation.z = Math.PI / 2;
+  bale.position.y = 0.5;
+  bale.castShadow = true;
+  group.add(bale);
+
+  // Straw texture bands
+  const bandGeo = new THREE.TorusGeometry(0.5, 0.03, 4, 12);
+  const bandMat = new THREE.MeshLambertMaterial({ color: 0xc8941e });
+  for (let i = -1; i <= 1; i++) {
+    const band = new THREE.Mesh(bandGeo, bandMat);
+    band.rotation.y = Math.PI / 2;
+    band.position.set(i * 0.25, 0.5, 0);
+    group.add(band);
+  }
+  return group;
+}
+
+const sceneryLeft = [];
+const sceneryRight = [];
+
+for (let i = 0; i < NUM_TREES_PER_SIDE; i++) {
+  const isHay = Math.random() < 0.35;
+
+  // Left side
+  const objL = isHay ? createHayBale() : createTree();
+  const scaleL = isHay ? 0.8 + Math.random() * 0.5 : 0.6 + Math.random() * 0.7;
+  objL.scale.set(scaleL, scaleL, scaleL);
+  objL.position.set(
+    -TRACK_WIDTH / 2 - 2 - Math.random() * 8,
+    0,
+    -i * TREE_SPACING - Math.random() * 4
+  );
+  objL.rotation.y = Math.random() * Math.PI * 2;
+  sceneryGroup.add(objL);
+  sceneryLeft.push(objL);
+
+  // Right side
+  const isHayR = Math.random() < 0.35;
+  const objR = isHayR ? createHayBale() : createTree();
+  const scaleR = isHayR ? 0.8 + Math.random() * 0.5 : 0.6 + Math.random() * 0.7;
+  objR.scale.set(scaleR, scaleR, scaleR);
+  objR.position.set(
+    TRACK_WIDTH / 2 + 2 + Math.random() * 8,
+    0,
+    -i * TREE_SPACING - Math.random() * 4
+  );
+  objR.rotation.y = Math.random() * Math.PI * 2;
+  sceneryGroup.add(objR);
+  sceneryRight.push(objR);
+}
+
+// ── Horse Builder ──
+function buildHorse(jockeyColor) {
+  const group = new THREE.Group();
+  const horseBrown = 0x8B4513;
+  const darkBrown = 0x5C3317;
+
+  // Body
+  const bodyGeo = new THREE.BoxGeometry(0.9, 0.7, 2.4);
+  const bodyMat = new THREE.MeshPhongMaterial({ color: horseBrown, shininess: 30 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.set(0, 1.1, 0);
+  body.castShadow = true;
+  group.add(body);
+
+  // Neck
+  const neckGeo = new THREE.BoxGeometry(0.4, 0.9, 0.5);
+  const neckMat = new THREE.MeshPhongMaterial({ color: horseBrown, shininess: 30 });
+  const neck = new THREE.Mesh(neckGeo, neckMat);
+  neck.position.set(0, 1.7, -1.1);
+  neck.rotation.x = -0.4;
+  neck.castShadow = true;
+  group.add(neck);
+
+  // Head
+  const headGeo = new THREE.BoxGeometry(0.35, 0.35, 0.7);
+  const headMat = new THREE.MeshPhongMaterial({ color: horseBrown, shininess: 30 });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.set(0, 2.1, -1.5);
+  head.castShadow = true;
+  group.add(head);
+
+  // Muzzle
+  const muzzleGeo = new THREE.BoxGeometry(0.25, 0.2, 0.3);
+  const muzzleMat = new THREE.MeshPhongMaterial({ color: darkBrown, shininess: 20 });
+  const muzzle = new THREE.Mesh(muzzleGeo, muzzleMat);
+  muzzle.position.set(0, 2.0, -1.85);
+  group.add(muzzle);
+
+  // Ears
+  const earGeo = new THREE.ConeGeometry(0.06, 0.2, 4);
+  const earMat = new THREE.MeshPhongMaterial({ color: horseBrown });
+  const earL = new THREE.Mesh(earGeo, earMat);
+  earL.position.set(-0.12, 2.35, -1.45);
+  group.add(earL);
+  const earR = new THREE.Mesh(earGeo, earMat);
+  earR.position.set(0.12, 2.35, -1.45);
+  group.add(earR);
+
+  // Eyes
+  const eyeGeo = new THREE.SphereGeometry(0.04, 6, 6);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeL.position.set(-0.18, 2.15, -1.55);
+  group.add(eyeL);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeR.position.set(0.18, 2.15, -1.55);
+  group.add(eyeR);
+
+  // Legs (4 legs with pivots for animation)
+  const legGeo = new THREE.BoxGeometry(0.18, 0.8, 0.18);
+  const legMat = new THREE.MeshPhongMaterial({ color: darkBrown, shininess: 20 });
+  const hoofGeo = new THREE.BoxGeometry(0.2, 0.15, 0.22);
+  const hoofMat = new THREE.MeshPhongMaterial({ color: 0x222222, shininess: 40 });
+
+  const legPositions = [
+    { x: -0.3, z: -0.85, name: 'frontLeft' },
+    { x: 0.3, z: -0.85, name: 'frontRight' },
+    { x: -0.3, z: 0.85, name: 'backLeft' },
+    { x: 0.3, z: 0.85, name: 'backRight' }
+  ];
+
+  group.legs = {};
+  legPositions.forEach(lp => {
+    const pivot = new THREE.Group();
+    pivot.position.set(lp.x, 0.75, lp.z);
+
+    const leg = new THREE.Mesh(legGeo, legMat);
+    leg.position.y = -0.4;
+    leg.castShadow = true;
+    pivot.add(leg);
+
+    const hoof = new THREE.Mesh(hoofGeo, hoofMat);
+    hoof.position.y = -0.85;
+    pivot.add(hoof);
+
+    group.add(pivot);
+    group.legs[lp.name] = pivot;
+  });
+
+  // Tail
+  const tailGeo = new THREE.CylinderGeometry(0.04, 0.08, 0.8, 6);
+  const tailMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a });
+  const tail = new THREE.Mesh(tailGeo, tailMat);
+  tail.position.set(0, 1.3, 1.3);
+  tail.rotation.x = 0.5;
+  group.add(tail);
+  group.tail = tail;
+
+  // Mane
+  const maneGeo = new THREE.BoxGeometry(0.08, 0.3, 0.9);
+  const maneMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a });
+  const mane = new THREE.Mesh(maneGeo, maneMat);
+  mane.position.set(0, 1.55, -0.6);
+  group.add(mane);
+
+  // Saddle
+  const saddleGeo = new THREE.BoxGeometry(0.95, 0.12, 0.8);
+  const saddleMat = new THREE.MeshPhongMaterial({ color: 0x3b1c0a, shininess: 50 });
+  const saddle = new THREE.Mesh(saddleGeo, saddleMat);
+  saddle.position.set(0, 1.52, -0.1);
+  group.add(saddle);
+
+  // Jockey
+  const jockeyGroup = new THREE.Group();
+
+  // Jockey body
+  const jBodyGeo = new THREE.BoxGeometry(0.4, 0.5, 0.35);
+  const jBodyMat = new THREE.MeshPhongMaterial({ color: jockeyColor, emissive: jockeyColor, emissiveIntensity: 0.3, shininess: 60 });
+  const jBody = new THREE.Mesh(jBodyGeo, jBodyMat);
+  jBody.position.set(0, 1.9, -0.1);
+  jBody.rotation.x = -0.2;
+  jBody.castShadow = true;
+  jockeyGroup.add(jBody);
+
+  // Jockey head
+  const jHeadGeo = new THREE.SphereGeometry(0.15, 8, 8);
+  const jHeadMat = new THREE.MeshPhongMaterial({ color: 0xf5cba7 });
+  const jHead = new THREE.Mesh(jHeadGeo, jHeadMat);
+  jHead.position.set(0, 2.25, -0.2);
+  jockeyGroup.add(jHead);
+
+  // Jockey helmet
+  const helmetGeo = new THREE.SphereGeometry(0.17, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const helmetMat = new THREE.MeshPhongMaterial({ color: jockeyColor, emissive: jockeyColor, emissiveIntensity: 0.3 });
+  const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+  helmet.position.set(0, 2.25, -0.2);
+  jockeyGroup.add(helmet);
+
+  group.add(jockeyGroup);
+  group.jockey = jockeyGroup;
+
+  return group;
+}
+
+function animateHorse(horse, time, speedRatio) {
+  if (!horse.legs) return;
+  const freq = 8 + speedRatio * 12;
+  const amp = 0.3 + speedRatio * 0.4;
+
+  // Diagonal gait: front-left + back-right, front-right + back-left
+  horse.legs.frontLeft.rotation.x = Math.sin(time * freq) * amp;
+  horse.legs.backRight.rotation.x = Math.sin(time * freq) * amp;
+  horse.legs.frontRight.rotation.x = Math.sin(time * freq + Math.PI) * amp;
+  horse.legs.backLeft.rotation.x = Math.sin(time * freq + Math.PI) * amp;
+
+  // Slight body bob
+  horse.position.y = Math.abs(Math.sin(time * freq * 2)) * 0.08 * speedRatio;
+
+  // Tail swish
+  if (horse.tail) {
+    horse.tail.rotation.x = 0.5 + Math.sin(time * 3) * 0.2;
+    horse.tail.rotation.z = Math.sin(time * 5) * 0.15;
+  }
+
+  // Jockey bob
+  if (horse.jockey) {
+    horse.jockey.position.y = Math.abs(Math.sin(time * freq * 2 + 0.5)) * 0.05 * speedRatio;
+  }
+}
+
+// ── Player horse ──
+const playerHorse = buildHorse(0x00ccff);
+playerHorse.position.set(0, 0, 5);
+scene.add(playerHorse);
+
+// ── Enemy management ──
+function spawnEnemy() {
+  const lane = Math.floor(Math.random() * LANE_COUNT);
+  const laneX = -TRACK_WIDTH / 2 + LANE_WIDTH / 2 + lane * LANE_WIDTH;
+  const colorIdx = Math.floor(Math.random() * JOCKEY_COLORS.length);
+
+  const horse = buildHorse(JOCKEY_COLORS[colorIdx]);
+  horse.position.set(laneX, 0, playerHorse.position.z - 200 - Math.random() * 80);
+
+  const enemy = {
+    mesh: horse,
+    speed: speed * (0.25 + Math.random() * 0.2),
+    lane: laneX,
+    passed: false,
+    animOffset: Math.random() * Math.PI * 2
+  };
+
+  scene.add(horse);
+  enemies.push(enemy);
+}
+
+function removeEnemy(idx) {
+  scene.remove(enemies[idx].mesh);
+  enemies[idx].mesh.traverse(child => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+  });
+  enemies.splice(idx, 1);
+}
+
+// ── Crash particles ──
+function spawnCrashParticles() {
+  const colors = [0x8B4513, 0xdaa520, 0xffffff, 0xd4a017, 0x556b2f];
+  for (let i = 0; i < 40; i++) {
+    const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+    const mat = new THREE.MeshBasicMaterial({ color: colors[Math.floor(Math.random() * colors.length)] });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(playerHorse.position);
+    mesh.position.y += 1;
+
+    const particle = {
+      mesh,
+      vx: (Math.random() - 0.5) * 8,
+      vy: 3 + Math.random() * 6,
+      vz: (Math.random() - 0.5) * 8,
+      life: 50 + Math.random() * 40
+    };
+    scene.add(mesh);
+    crashParticles.push(particle);
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = crashParticles.length - 1; i >= 0; i--) {
+    const p = crashParticles[i];
+    p.mesh.position.x += p.vx * dt;
+    p.mesh.position.y += p.vy * dt;
+    p.mesh.position.z += p.vz * dt;
+    p.vy -= 12 * dt;
+    p.mesh.rotation.x += 5 * dt;
+    p.mesh.rotation.z += 3 * dt;
+    p.mesh.material.opacity = Math.max(0, p.life / 80);
+    p.mesh.material.transparent = true;
+    p.life--;
+
+    if (p.life <= 0 || p.mesh.position.y < -1) {
+      scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      p.mesh.material.dispose();
+      crashParticles.splice(i, 1);
+    }
+  }
+}
+
+// ── Collision ──
+function checkCollision() {
+  const px = playerHorse.position.x;
+  const pz = playerHorse.position.z;
+  for (const e of enemies) {
+    const dx = Math.abs(px - e.mesh.position.x);
+    const dz = Math.abs(pz - e.mesh.position.z);
+    if (dx < 1.2 && dz < 2.5) return true;
+  }
+  return false;
+}
+
+// ── Recycle world ──
+function recycleWorld() {
+  const pz = playerHorse.position.z;
+
+  trackSegments.forEach(seg => {
+    if (seg.position.z > pz + SEGMENT_LENGTH * 2) {
+      seg.position.z -= NUM_SEGMENTS * SEGMENT_LENGTH;
+    }
+  });
+
+  const totalFenceSpan = NUM_FENCE_POSTS * FENCE_SPACING;
+  fencePosts.forEach(fp => {
+    if (fp.group.position.z > pz + FENCE_SPACING * 2) {
+      fp.group.position.z -= totalFenceSpan;
+    }
+  });
+
+  const totalScenerySpan = NUM_TREES_PER_SIDE * TREE_SPACING;
+  sceneryLeft.forEach(t => {
+    if (t.position.z > pz + TREE_SPACING * 2) {
+      t.position.z -= totalScenerySpan;
+      t.position.x = -TRACK_WIDTH / 2 - 2 - Math.random() * 8;
+    }
+  });
+  sceneryRight.forEach(t => {
+    if (t.position.z > pz + TREE_SPACING * 2) {
+      t.position.z -= totalScenerySpan;
+      t.position.x = TRACK_WIDTH / 2 + 2 + Math.random() * 8;
+    }
+  });
+
+  ground.position.z = pz - TRACK_LENGTH / 2;
+}
+
+// ── Game logic ──
+function resetGame() {
+  score = 0;
+  scoreFrac = 0;
+  speed = 0;
+  frameCount = 0;
+  playerVx = 0;
+  gallopTime = 0;
+
+  playerHorse.position.set(0, 0, 5);
+  playerHorse.rotation.y = 0;
+  playerHorse.visible = true;
+
+  for (let i = enemies.length - 1; i >= 0; i--) removeEnemy(i);
+
+  crashParticles.forEach(p => {
+    scene.remove(p.mesh);
+    p.mesh.geometry.dispose();
+    p.mesh.material.dispose();
+  });
+  crashParticles = [];
+
+  trackSegments.forEach((seg, i) => { seg.position.z = -i * SEGMENT_LENGTH; });
+  fencePosts.forEach((fp, i) => {
+    const idx = i % NUM_FENCE_POSTS;
+    fp.group.position.z = -idx * FENCE_SPACING;
+  });
+  sceneryLeft.forEach((t, i) => {
+    t.position.z = -i * TREE_SPACING - Math.random() * 4;
+    t.position.x = -TRACK_WIDTH / 2 - 2 - Math.random() * 8;
+  });
+  sceneryRight.forEach((t, i) => {
+    t.position.z = -i * TREE_SPACING - Math.random() * 4;
+    t.position.x = TRACK_WIDTH / 2 + 2 + Math.random() * 8;
+  });
+
+  ground.position.z = -TRACK_LENGTH / 2;
+  clock = new THREE.Clock();
+}
+
+function update() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  frameCount++;
+  gallopTime += dt;
+
+  // Auto-accelerate
+  const currentMax = Math.min(maxSpeed, 25 + frameCount * 0.018);
+  speed += 12 * dt;
+  if (speed > currentMax) speed = currentMax;
+
+  // Off-track slowdown
+  if (Math.abs(playerHorse.position.x) > TRACK_WIDTH / 2 + 0.5) {
+    speed -= 30 * dt;
+    if (speed < 8) speed = 8;
+  }
+
+  // Steering
+  const steerForce = 8;
+  const steerFriction = Math.pow(0.12, dt);
+
+  if (keys['ArrowLeft'] || keys['KeyA']) playerVx -= steerForce * dt;
+  if (keys['ArrowRight'] || keys['KeyD']) playerVx += steerForce * dt;
+
+  playerVx *= steerFriction;
+  const maxVx = 7;
+  if (Math.abs(playerVx) > maxVx) playerVx = maxVx * Math.sign(playerVx);
+
+  playerHorse.position.x += playerVx * dt;
+
+  const trackLimit = TRACK_WIDTH / 2 + 1.5;
+  if (playerHorse.position.x < -trackLimit) { playerHorse.position.x = -trackLimit; playerVx = 0; }
+  if (playerHorse.position.x > trackLimit) { playerHorse.position.x = trackLimit; playerVx = 0; }
+
+  // Move forward
+  playerHorse.position.z -= speed * dt;
+
+  // Slight turn lean
+  playerHorse.rotation.y = -playerVx * 0.015;
+
+  // Animate player horse
+  const speedRatio = Math.min(speed / maxSpeed, 1);
+  animateHorse(playerHorse, gallopTime, speedRatio);
+
+  // Camera
+  camera.position.x = playerHorse.position.x * 0.5;
+  camera.position.z = playerHorse.position.z + 8;
+  camera.position.y = 3.5 + speedRatio * 1;
+  camera.lookAt(
+    playerHorse.position.x * 0.3,
+    1.5,
+    playerHorse.position.z - 15
+  );
+
+  // Sun follows
+  sunLight.position.set(playerHorse.position.x + 30, 50, playerHorse.position.z - 20);
+  sunLight.target.position.set(playerHorse.position.x, 0, playerHorse.position.z - 20);
+  sunLight.target.updateMatrixWorld();
+
+  recycleWorld();
+
+  // Spawn enemies
+  const spawnRate = Math.max(18, 50 - Math.floor(frameCount / 250) * 2);
+  if (frameCount % spawnRate === 0) spawnEnemy();
+
+  // Update enemies
+  enemies.forEach(e => {
+    e.mesh.position.z += e.speed * dt * 0.12;
+    animateHorse(e.mesh, gallopTime + e.animOffset, 0.6 + Math.random() * 0.1);
+  });
+
+  // Remove + whoosh
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    if (enemies[i].mesh.position.z > playerHorse.position.z + 4 && !enemies[i].passed) {
+      enemies[i].passed = true;
+      playCrowdCheer();
+    }
+    if (enemies[i].mesh.position.z > playerHorse.position.z + 30) {
+      removeEnemy(i);
+    }
+  }
+
+  // Collision
+  if (checkCollision()) {
+    spawnCrashParticles();
+    gameOver();
+    return;
+  }
+
+  // Score
+  scoreFrac += speed * dt;
+  if (scoreFrac >= 1) {
+    const add = Math.floor(scoreFrac);
+    score += add;
+    scoreFrac -= add;
+  }
+
+  updateParticles(dt);
+
+  // Gallop sound rate
+  if (frameCount % 30 === 0) updateGallopRate();
+
+  // HUD
+  scoreEl.textContent = `Score: ${score}`;
+  const paceNames = ['Walk', 'Trot', 'Canter', 'Gallop', 'Full Sprint'];
+  const paceIdx = Math.min(Math.floor(speedRatio * paceNames.length), paceNames.length - 1);
+  speedEl.textContent = `Pace: ${paceNames[paceIdx]}`;
+}
+
+function gameOver() {
+  gameState = 'dying';
+  playerHorse.visible = false;
+  stopGallop();
+  playFall();
+
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('horseRacingHighScore', highScore.toString());
+    highScoreEl.textContent = `Best: ${highScore}`;
+  }
+
+  setTimeout(() => {
+    gameState = 'gameover';
+    overlayTitle.textContent = 'Stumbled!';
+    overlayMsg.textContent = score >= highScore ? 'New High Score!' : 'Try again!';
+    finalScoreEl.textContent = `Score: ${score}`;
+    finalScoreEl.classList.remove('hidden');
+    startBtn.textContent = 'Race Again';
+    overlayEl.classList.remove('hidden');
+  }, 1200);
+}
+
+function startGame() {
+  initAudio();
+  resetGame();
+  gameState = 'playing';
+  overlayEl.classList.add('hidden');
+  finalScoreEl.classList.add('hidden');
+  startGallop();
+}
+
+// ── Render loop ──
+function animate() {
+  requestAnimationFrame(animate);
+  if (gameState === 'playing') {
+    update();
+  } else if (gameState === 'dying') {
+    const dt = Math.min(clock.getDelta(), 0.05);
+    updateParticles(dt);
+    camera.position.y += 2 * dt;
+  }
+  renderer.render(scene, camera);
+}
+
+// ── Input ──
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+    e.preventDefault();
+  }
+  if (e.code === 'Space' && gameState !== 'playing') startGame();
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+startBtn.addEventListener('click', startGame);
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ── Init ──
+resetGame();
+animate();
+</script>
+</body>
+</html>
