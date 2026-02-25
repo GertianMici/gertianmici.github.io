@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://unpkg.com;" />
 <title>3D Chess</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1514,7 +1516,7 @@ function buildCustomizePanel() {
       uploadBtn.textContent = 'Upload';
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/*';
+      input.accept = '.png,.jpg,.jpeg,.webp';
       input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;

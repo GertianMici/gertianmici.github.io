@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
 <title>Llama Race - Betting</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -393,6 +395,16 @@ let raceTime = 0;
 let trackLength = 0;
 let animFrame = null;
 
+// Escape HTML entities to prevent XSS when inserting user-supplied text into innerHTML
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Cryptographic randomness for unpredictable results
 function secureRandom() {
   const arr = new Uint32Array(1);
@@ -471,7 +483,7 @@ function renderBets() {
     const l = LLAMAS[b.llama];
     return `<div class="bet-entry">
       <span>
-        <span class="bet-name">${b.name}</span> on
+        <span class="bet-name">${escapeHtml(b.name)}</span> on
         <span class="bet-llama" style="background:${l.color}"></span>${l.name}
       </span>
       <span class="bet-amount">$${b.amount.toFixed(2)}</span>
@@ -1006,7 +1018,7 @@ function calculateResults(winnerIdx) {
     const profitStr = profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`;
 
     html += `<div class="result-entry ${isWin ? 'result-win' : 'result-lose'}">
-      <strong>${b.name}</strong> bet $${b.amount.toFixed(2)} on ${LLAMAS[b.llama].name}
+      <strong>${escapeHtml(b.name)}</strong> bet $${b.amount.toFixed(2)} on ${LLAMAS[b.llama].name}
       ${isWin ? `— WON $${payout.toFixed(2)} (${profitStr})` : `— LOST (${profitStr})`}
     </div>`;
   });
