@@ -112,7 +112,8 @@
     <p class="updated">Last updated: 6 August 2026</p>
 
     <p>Helkost has no server, no account, and no analytics. Everything it knows
-    lives on your iPhone or in your own iCloud.</p>
+    lives on your iPhone or in your own iCloud — with one exception, contributing
+    to Open Food Facts, which is public by design and described below.</p>
 
     <h2>What Helkost stores, and where</h2>
 
@@ -120,12 +121,27 @@
     app — 1,135,564 products, read-only. Your language, daily energy target and
     body details are kept in the app's own settings.</p>
 
-    <p><strong>In your iCloud, not ours.</strong> Your food diary, scan history,
-    saved recipes, shopping list, meal plan and cooking chat sync through
-    CloudKit to your private iCloud database. That is your Apple account,
-    governed by <a href="https://www.apple.com/legal/privacy/">Apple's privacy
-    policy</a>. Nobody else can read it, and neither can the developer of this
-    app.</p>
+    <p><strong>In your iCloud, not ours.</strong> These sync through CloudKit to
+    your private iCloud database:</p>
+
+    <ul>
+      <li>your food diary and the portions you log</li>
+      <li>your scan history</li>
+      <li>saved recipes, and the meal plan you build from them</li>
+      <li>your shopping list</li>
+      <li>the prices you record for products</li>
+      <li>the ingredient labels you have read with the camera</li>
+      <li>your cooking chat</li>
+    </ul>
+
+    <p>That is your Apple account, governed by
+    <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a>.
+    Nobody else can read it, and neither can the developer of this app.</p>
+
+    <p><strong>In the iOS Keychain.</strong> Two credentials, only if you choose
+    to use the features that need them: your own OpenAI API key, and your Open
+    Food Facts username and password. Both are stored on that device only,
+    excluded from backups, and deletable from inside the app.</p>
 
     <p><strong>In Apple Health, if you allow it.</strong> With your permission
     Helkost reads the energy you have burned, so the daily target reflects how
@@ -136,12 +152,42 @@
 
     <h2>What leaves your device</h2>
 
-    <p>Two things, both only when you ask for them:</p>
+    <p>Three things, all of them only when you ask for them.</p>
 
     <p><strong>Barcode lookups.</strong> When you scan a product the app does
     not carry, Helkost asks <a href="https://world.openfoodfacts.org">Open Food
     Facts</a> about that barcode. The barcode is all that is sent — no
     identifier, nothing about you, nothing about your diary.</p>
+
+    <p><strong>Contributing a label to Open Food Facts — this one is
+    public.</strong> Roughly three in four products on a Swedish shelf have no
+    ingredient list in Open Food Facts, and reading labels is the only way that
+    gets fixed. If you want to send yours back, <strong>More →
+    Contribute</strong> asks for an Open Food Facts account and sends, for each
+    label you choose to submit:</p>
+
+    <ul>
+      <li>the barcode</li>
+      <li>the ingredient text you read from the package</li>
+      <li>your Open Food Facts username, as the author of the edit</li>
+      <li>a note that the edit came from Helkost</li>
+    </ul>
+
+    <p>Open Food Facts is a <strong>public, openly licensed database</strong>.
+    What you submit becomes visible to anyone, is attributed to your Open Food
+    Facts username, is kept in that product's public edit history, and is
+    redistributed under the
+    <a href="https://opendatacommons.org/licenses/odbl/">Open Database
+    License</a>. Treat it as permanent: this is publishing, not syncing, and it
+    is not meaningfully retractable afterwards.</p>
+
+    <p>It is entirely optional and off until you enter an account. Nothing about
+    your diary, your health data, your device or your other scans is ever
+    included — only the barcode and the ingredient text you chose to send.
+    Removing the account in <strong>More → Contribute</strong> stops it. Your
+    Open Food Facts account itself is governed by
+    <a href="https://world.openfoodfacts.org/privacy">their privacy
+    policy</a>.</p>
 
     <p><strong>The AI features, if you turn them on.</strong> They are off until
     you enter your own OpenAI API key, which is stored in the iOS Keychain on
@@ -161,10 +207,17 @@
     does not have access to the rest of your photo library — iOS shows you its
     own picker and hands over only the image you choose.</p>
 
+    <p>A meal photo is analysed for a calorie estimate only if you have turned
+    on the AI features with your own key, in which case that image goes to
+    OpenAI and nowhere else. Otherwise it stays on your device and in your
+    iCloud.</p>
+
     <h2>What Helkost does not do</h2>
 
     <ul>
-      <li>No accounts, no sign-up, no email address.</li>
+      <li>No accounts, no sign-up, no email address. The Open Food Facts and
+          OpenAI accounts above are optional, are yours, and are held by those
+          services rather than by this app.</li>
       <li>No analytics, no crash reporting, no advertising, no third-party SDKs.</li>
       <li>No tracking of any kind, and no data shared with data brokers.</li>
       <li>No selling of anything to anyone.</li>
@@ -175,7 +228,9 @@
 
     <h2>Children</h2>
 
-    <p>Helkost collects nothing from anyone, at any age.</p>
+    <p>Helkost collects nothing from anyone, at any age. Contributing to Open
+    Food Facts publishes under an account you create there, and their own terms
+    apply to who may hold one.</p>
 
     <h2>Deleting your data</h2>
 
@@ -183,13 +238,18 @@
     copy, open <strong>Settings → [your name] → iCloud → Manage Account Storage
     → Helkost</strong> and delete the data there.</p>
 
+    <p>Anything you contributed to Open Food Facts lives in their database, not
+    this one. Ask Open Food Facts about that.</p>
+
     <h2>Not medical advice</h2>
 
     <p>Helkost describes how processed a food is, using the NOVA classification,
     and shows nutrition figures published by Open Food Facts. NOVA describes
-    processing, <strong>not</strong> healthiness. Nothing in the app is medical
-    or dietary advice. Talk to a doctor or a dietitian about anything that
-    matters to your health.</p>
+    processing, <strong>not</strong> healthiness. Calorie estimates from a
+    photograph are estimates, and the app shows them as a range with its
+    assumptions visible for that reason. Nothing in the app is medical or
+    dietary advice. Talk to a doctor or a dietitian about anything that matters
+    to your health.</p>
 
     <h2>Contact</h2>
 
