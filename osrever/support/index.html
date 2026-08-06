@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+  <meta name="theme-color" content="#0f0f23">
+  <meta name="description"
+        content="Support and common questions for OsreveR, the reverse-voice party game for iPhone.">
+  <link rel="icon" href="/favicon.ico">
+  <title>OsreveR — Support</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --fg: #f2f4f8;
+      --muted: #a6aec4;
+      --soft: #ccd3e2;
+      --accent: #00d4ff;
+      --rule: rgba(255, 255, 255, 0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+      background-attachment: fixed;
+      color: var(--fg);
+      font: 400 17px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .wrap { max-width: 44rem; margin: 0 auto; padding: 4rem 1.35rem 3rem; }
+
+    .eyebrow {
+      margin: 0 0 0.7rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.9rem, 6vw, 2.5rem);
+      font-weight: 800;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+    }
+
+    .lede { margin: 0 0 2.5rem; color: var(--muted); font-size: 1.02rem; }
+
+    h2 {
+      margin: 2.9rem 0 0.9rem;
+      padding-top: 1.7rem;
+      border-top: 1px solid var(--rule);
+      font-size: 1.16rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    p, li, dd { margin: 0 0 1.1rem; }
+    ol, ul { margin: 0 0 1.1rem; padding-left: 1.2rem; }
+    li { margin-bottom: 0.5rem; }
+    dl { margin: 0; }
+    dt { margin: 1.9rem 0 0.45rem; font-weight: 600; }
+    dd { margin-left: 0; color: var(--soft); }
+
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 0.18em;
+      text-decoration-thickness: 1px;
+    }
+
+    a:hover { text-decoration-thickness: 2px; }
+
+    strong { font-weight: 600; color: #fff; }
+
+    footer {
+      margin-top: 3.2rem;
+      padding-top: 1.6rem;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    footer p { margin: 0 0 0.5rem; }
+
+    @media (max-width: 480px) {
+      body { font-size: 16px; }
+      .wrap { padding: 2.75rem 1.15rem 2.5rem; }
+    }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      .wrap { max-width: none; padding: 0; }
+      .eyebrow, a { color: #000; }
+      h2, footer { border-color: #ccc; }
+      dd, .lede, footer { color: #333; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+
+    <p class="eyebrow">OsreveR</p>
+    <h1>Support</h1>
+    <p class="lede">Say it backwards. Then flip it. Record a word, hear it
+    reversed into gibberish, and dare a friend to copy the sound.</p>
+
+    <h2>Getting help</h2>
+
+    <p>Email <a href="mailto:gertian.mici@gmail.com">gertian.mici@gmail.com</a>.
+    Say which iPhone and which iOS version you are on, and what you expected to
+    happen — it makes a fix much faster.</p>
+
+    <h2>How to play</h2>
+
+    <ol>
+      <li><strong>Player 1 records a word</strong> — a single clear word or short phrase.</li>
+      <li><strong>Hear it reversed.</strong> OsreveR flips the audio. It sounds like gibberish.</li>
+      <li><strong>Player 2 mimics it.</strong> Listen as many times as you like, then copy the reversed sound.</li>
+      <li><strong>Flip and reveal.</strong> OsreveR reverses Player 2's attempt and plays it next to the original, so everyone can judge the match.</li>
+    </ol>
+
+    <p>It is a pass-and-play game: one device, two or more players taking
+    turns.</p>
+
+    <h2>Common questions</h2>
+
+    <dl>
+      <dt>Nothing gets recorded when I tap the record button.</dt>
+      <dd>OsreveR needs the microphone. Check
+      <strong>Settings → OsreveR → Microphone</strong> and turn it on. If you
+      declined the permission the first time, that is the only place to grant
+      it again.</dd>
+
+      <dt>The match meter gave me a low score, but it sounded right.</dt>
+      <dd>The meter compares the shape of the two recordings — how the loudness
+      rises and falls — not the words themselves. It is not speech recognition,
+      and it is meant as a laugh rather than a verdict. Background noise and how
+      far you hold the phone both move the number around.</dd>
+
+      <dt>Does it need an internet connection?</dt>
+      <dd>No. Everything happens on the device, and the app has no networking
+      code at all. It works the same in aeroplane mode.</dd>
+
+      <dt>Can I save or share a recording?</dt>
+      <dd>No. Clips live in the app's temporary storage for the round you are
+      playing and are removed when you start a new one.</dd>
+
+      <dt>My recording sounds quiet or clipped.</dt>
+      <dd>Record in a quiet room, hold the phone about a hand's width away, and
+      say one clear word rather than a long sentence. Short, distinct words
+      reverse into the funniest gibberish and are the easiest to mimic.</dd>
+
+      <dt>Which iPhones does it work on?</dt>
+      <dd>Any iPhone running iOS 16 or later.</dd>
+
+      <dt>How do I delete my recordings?</dt>
+      <dd>Start a new round, which clears the previous ones, or delete the app
+      to remove anything left.</dd>
+    </dl>
+
+    <h2>Privacy</h2>
+
+    <p>OsreveR has no server, no account and no analytics, and your recordings
+    never leave your phone. The full
+    <a href="/osrever/privacy/">privacy policy</a> spells out what that
+    means.</p>
+
+    <footer>
+      <p>OsreveR is made by Gertian Mici.</p>
+      <p><a href="/osrever/privacy/">Privacy policy</a> · <a href="/osrever/">All OsreveR documents</a></p>
+    </footer>
+
+  </main>
+</body>
+
+</html>

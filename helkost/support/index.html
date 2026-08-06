@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+  <meta name="theme-color" content="#0f0f23">
+  <meta name="description"
+        content="Support and common questions for Helkost, the iOS app that tells you how processed a product is.">
+  <link rel="icon" href="/favicon.ico">
+  <title>Helkost — Support</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --fg: #f2f4f8;
+      --muted: #a6aec4;
+      --soft: #ccd3e2;
+      --accent: #00d4ff;
+      --rule: rgba(255, 255, 255, 0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+      background-attachment: fixed;
+      color: var(--fg);
+      font: 400 17px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .wrap { max-width: 44rem; margin: 0 auto; padding: 4rem 1.35rem 3rem; }
+
+    .eyebrow {
+      margin: 0 0 0.7rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.9rem, 6vw, 2.5rem);
+      font-weight: 800;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+    }
+
+    .lede { margin: 0 0 2.5rem; color: var(--muted); font-size: 1.02rem; }
+
+    h2 {
+      margin: 2.9rem 0 0.9rem;
+      padding-top: 1.7rem;
+      border-top: 1px solid var(--rule);
+      font-size: 1.16rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    p, li, dd { margin: 0 0 1.1rem; }
+    ul { margin: 0 0 1.1rem; padding-left: 1.2rem; }
+    li { margin-bottom: 0.5rem; }
+    dl { margin: 0; }
+    dt { margin: 1.9rem 0 0.45rem; font-weight: 600; }
+    dd { margin-left: 0; color: var(--soft); }
+
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 0.18em;
+      text-decoration-thickness: 1px;
+    }
+
+    a:hover { text-decoration-thickness: 2px; }
+
+    strong { font-weight: 600; color: #fff; }
+
+    footer {
+      margin-top: 3.2rem;
+      padding-top: 1.6rem;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    footer p { margin: 0 0 0.5rem; }
+
+    @media (max-width: 480px) {
+      body { font-size: 16px; }
+      .wrap { padding: 2.75rem 1.15rem 2.5rem; }
+    }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      .wrap { max-width: none; padding: 0; }
+      .eyebrow, a { color: #000; }
+      h2, footer { border-color: #ccc; }
+      dd, .lede, footer { color: #333; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+
+    <p class="eyebrow">Helkost</p>
+    <h1>Support</h1>
+    <p class="lede">Scan a product, find out how processed it is, and get a
+    recipe for making it yourself instead.</p>
+
+    <h2>Getting help</h2>
+
+    <p>Email <a href="mailto:gertian.mici@gmail.com">gertian.mici@gmail.com</a>.
+    Say which iPhone and which iOS version you are on, and what you expected to
+    happen — it makes a fix much faster.</p>
+
+    <h2>Common questions</h2>
+
+    <dl>
+      <dt>A product I scanned wasn't found.</dt>
+      <dd>Helkost carries every product Open Food Facts has given a NOVA
+      rating — 1.1 million of them — and looks up anything else online as you
+      scan it. If a barcode is missing from Open Food Facts entirely, nobody has
+      added it yet. You can add it yourself at
+      <a href="https://world.openfoodfacts.org">openfoodfacts.org</a>, and
+      Helkost's <strong>Contribute</strong> screen helps you send in the labels
+      you have photographed.</dd>
+
+      <dt>Why does a product with the Keyhole still show NOVA 4?</dt>
+      <dd>Because they measure different things. The Keyhole (Nyckelhålet) rates
+      fat, sugar, salt and fibre. NOVA rates how industrially processed a food
+      is. A product can do well on one and badly on the other, and Helkost shows
+      you both rather than hiding the contrast.</dd>
+
+      <dt>Is NOVA the same as healthy?</dt>
+      <dd>No. NOVA describes processing, not healthiness. Helkost is not medical
+      advice — see a doctor or a dietitian for anything that matters to your
+      health.</dd>
+
+      <dt>My diary didn't appear on my other device.</dt>
+      <dd>Syncing goes through your own iCloud. Check that you are signed into
+      the same Apple Account on both, and that <strong>Settings → [your name] →
+      iCloud → iCloud Drive</strong> is on. The first sync can take a few
+      minutes.</dd>
+
+      <dt>The AI features are greyed out.</dt>
+      <dd>They stay off until you add your own OpenAI API key in
+      <strong>More → AI</strong>. Calls are billed to your own OpenAI account.
+      The key is kept in the iOS Keychain on that device and is never sent
+      anywhere except to OpenAI. The rest of the app works fully without it.</dd>
+
+      <dt>Why is the app so large?</dt>
+      <dd>The whole product database is inside it, so scanning works with no
+      network at all — in a shop basement, on aeroplane mode, anywhere.</dd>
+
+      <dt>How do I delete everything?</dt>
+      <dd>Deleting the app clears the device. For the synced copy, open
+      <strong>Settings → [your name] → iCloud → Manage Account Storage →
+      Helkost</strong>.</dd>
+    </dl>
+
+    <h2>Data credits</h2>
+
+    <p>Product data comes from
+    <a href="https://world.openfoodfacts.org">Open Food Facts</a>, used under the
+    <a href="https://opendatacommons.org/licenses/odbl/1-0/">Open Database
+    License (ODbL)</a>. Health guidance follows
+    <a href="https://www.livsmedelsverket.se">Livsmedelsverket</a>.</p>
+
+    <h2>Privacy</h2>
+
+    <p>Helkost has no server, no account and no analytics. The full
+    <a href="/helkost/privacy/">privacy policy</a> spells out what that means.</p>
+
+    <footer>
+      <p>Helkost is made by Gertian Mici.</p>
+      <p><a href="/helkost/privacy/">Privacy policy</a> · <a href="/helkost/">All Helkost documents</a></p>
+    </footer>
+
+  </main>
+</body>
+
+</html>
