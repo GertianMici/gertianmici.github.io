@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+<title>Tower Stack 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    /* Stop pull-to-refresh and iOS rubber-banding from firing mid-game. */
+    overscroll-behavior: none;
+  }
+  body {
+    background: linear-gradient(180deg, #0b0a1e 0%, #17163a 48%, #2b2760 100%);
+    overflow: hidden;
+    height: 100vh; height: 100dvh;
+    width: 100vw;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    color: #fff;
+  }
+  #gameContainer {
+    position: relative; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden;
+    /* iOS ignores user-scalable=no, so kill pan/double-tap-zoom here instead.
+       Taps still reach the drop handler, the link and the buttons. */
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  /* ── HUD ── */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: flex-end; align-items: flex-start;
+    padding: 14px 20px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 100%);
+    pointer-events: none; z-index: 10;
+  }
+  #hud > * { pointer-events: auto; }
+  /* Sits above the overlay (z-index 20) so it stays reachable on the menu
+     and game-over screens, not just mid-game. */
+  #backLink {
+    position: absolute; top: 14px; left: 20px; z-index: 30;
+    display: inline-flex; align-items: center; gap: 6px;
+    color: rgba(255,255,255,0.72); text-decoration: none;
+    font-size: 14px; font-weight: 600;
+    padding: 7px 13px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.07);
+    transition: color 0.2s, background 0.2s;
+  }
+  #backLink:hover { color: #fff; background: rgba(255,255,255,0.16); }
+  #scoreWrap { text-align: right; line-height: 1.1; }
+  #scoreDisplay {
+    font-size: 42px; font-weight: 800; letter-spacing: -1px;
+    text-shadow: 0 3px 12px rgba(0,0,0,0.55);
+  }
+  #bestDisplay {
+    font-size: 13px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; color: rgba(255,255,255,0.55); margin-top: 2px;
+  }
+
+  /* ── Perfect combo flash ── */
+  #comboFlash {
+    position: absolute; top: 30%; left: 0; right: 0;
+    text-align: center; z-index: 12; pointer-events: none;
+    font-size: 34px; font-weight: 800; letter-spacing: 1px;
+    color: #ffe27a; text-shadow: 0 0 22px rgba(255,214,90,0.75);
+    opacity: 0;
+  }
+  #comboFlash.show { animation: comboPop 0.75s ease-out forwards; }
+  @keyframes comboPop {
+    0%   { opacity: 0; transform: scale(0.7) translateY(10px); }
+    22%  { opacity: 1; transform: scale(1.12) translateY(0); }
+    45%  { transform: scale(1); }
+    100% { opacity: 0; transform: scale(1) translateY(-26px); }
+  }
+
+  /* ── Overlay ── */
+  #overlay {
+    position: absolute; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 7, 24, 0.72);
+    backdrop-filter: blur(3px);
+    padding: 24px;
+    transition: opacity 0.3s ease;
+    /* Short landscape phones: let the panel scroll rather than clip the
+       button out of reach, since the body itself cannot scroll. */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #overlay.is-hidden { opacity: 0; pointer-events: none; }
+  #overlayInner { text-align: center; max-width: 460px; }
+  #overlayTitle {
+    font-size: 54px; font-weight: 800; letter-spacing: -1.5px; line-height: 1;
+    margin-bottom: 16px;
+  }
+  #titleAccent {
+    background: linear-gradient(135deg, #00d4ff 0%, #7b5cff 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  #overlayMsg {
+    font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.72);
+    margin-bottom: 26px;
+  }
+  #statsRow { display: flex; justify-content: center; gap: 26px; margin-bottom: 24px; }
+  .stat { display: flex; flex-direction: column; gap: 3px; min-width: 76px; }
+  .stat-value { font-size: 34px; font-weight: 800; line-height: 1; }
+  .stat-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.4px;
+    text-transform: uppercase; color: rgba(255,255,255,0.5);
+  }
+  #startBtn {
+    background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+    color: #04121b; border: none; cursor: pointer;
+    padding: 15px 42px; border-radius: 999px;
+    font-size: 17px; font-weight: 700; font-family: inherit;
+    box-shadow: 0 10px 28px rgba(0, 212, 255, 0.32);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  #startBtn:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0, 212, 255, 0.42); }
+  #startBtn:active { transform: translateY(0); }
+  .controls-hint { font-size: 13px; color: rgba(255,255,255,0.45); margin-top: 18px; }
+
+  .hidden { display: none !important; }
+
+
+  /* ── Compact screens ── */
+  @media (max-width: 480px) {
+    #hud { padding: 10px 14px; }
+    #backLink { top: 10px; left: 14px; font-size: 13px; }
+    #scoreDisplay { font-size: 34px; }
+    #overlayTitle { font-size: 40px; }
+    #overlayMsg { font-size: 14px; margin-bottom: 22px; }
+    #comboFlash { font-size: 26px; }
+    .stat-value { font-size: 28px; }
+    #statsRow { gap: 16px; }
+  }
+
+  /* Landscape phones — very little vertical room, so compress the panel. */
+  @media (max-height: 500px) {
+    #overlayTitle { font-size: 32px; margin-bottom: 10px; }
+    #overlayMsg { font-size: 13px; line-height: 1.45; margin-bottom: 14px; }
+    #statsRow { margin-bottom: 14px; gap: 20px; }
+    .stat-value { font-size: 24px; }
+    #startBtn { padding: 12px 34px; font-size: 16px; }
+    .controls-hint { margin-top: 10px; }
+    #scoreDisplay { font-size: 30px; }
+    #comboFlash { top: 22%; font-size: 24px; }
+  }
+
+  /* Touch devices: guarantee 44px tap targets. Last in the sheet so the
+     size-based queries above cannot shrink them back below the minimum. */
+  @media (pointer: coarse) {
+    #backLink { min-height: 44px; padding: 10px 18px; font-size: 15px; }
+    #startBtn { min-height: 48px; padding: 14px 40px; }
+  }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <a id="backLink" href="/#/games" target="_top">&#8592; Arcade</a>
+  <div id="hud">
+    <div id="scoreWrap">
+      <div id="scoreDisplay">0</div>
+      <div id="bestDisplay">Best 0</div>
+    </div>
+  </div>
+
+  <div id="comboFlash"></div>
+
+  <div id="overlay">
+    <div id="overlayInner">
+      <h1 id="overlayTitle"><span id="titleLead">Tower</span> <span id="titleAccent">Stack</span></h1>
+      <div id="statsRow" class="hidden">
+        <div class="stat"><span class="stat-value" id="finalScore">0</span><span class="stat-label">Score</span></div>
+        <div class="stat"><span class="stat-value" id="finalHeight">0</span><span class="stat-label">Height</span></div>
+        <div class="stat"><span class="stat-value" id="finalBest">0</span><span class="stat-label">Best</span></div>
+      </div>
+      <p id="overlayMsg">Blocks slide across the top of the tower. Drop one and any overhang gets sliced off &mdash; nail it dead centre for a perfect and keep your full width.</p>
+      <button id="startBtn">Start Stacking</button>
+      <div class="controls-hint" id="controlsHint">Press Space or click to drop</div>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ── DOM ──
+const container = document.getElementById('gameContainer');
+const overlayEl = document.getElementById('overlay');
+const titleLeadEl = document.getElementById('titleLead');
+const titleAccentEl = document.getElementById('titleAccent');
+const overlayMsgEl = document.getElementById('overlayMsg');
+const startBtn = document.getElementById('startBtn');
+const scoreEl = document.getElementById('scoreDisplay');
+const bestEl = document.getElementById('bestDisplay');
+const statsRowEl = document.getElementById('statsRow');
+const finalScoreEl = document.getElementById('finalScore');
+const finalHeightEl = document.getElementById('finalHeight');
+const finalBestEl = document.getElementById('finalBest');
+const comboFlashEl = document.getElementById('comboFlash');
+const controlsHintEl = document.getElementById('controlsHint');
+
+// ── Constants ──
+const BASE_SIZE = 5;             // width/depth of the starting block
+const BLOCK_HEIGHT = 0.9;
+const FOUNDATION_BLOCKS = 4;     // decorative plinth below the base
+const PERFECT_EPS = 0.09;        // |delta| under this counts as a perfect drop
+const PERFECTS_PER_GROW = 4;     // perfects needed before the block widens again
+const PERFECT_GROW = 0.35;
+const BASE_SPEED = 4.2;
+const SPEED_STEP = 0.16;
+const MAX_SPEED = 13;
+const AMPLITUDE_PAD = 2.6;       // travel beyond the edge of the block below
+const GRAVITY = 26;
+const MIN_VIEW_H = 15;           // minimum world units visible horizontally
+// On the isometric diagonal both the X and Z extents of a block project onto
+// screen width, so a block's half-width on screen is (sizeX + sizeZ) * ISO_PROJ
+// and an offset along the moving axis shifts it by offset * ISO_PROJ.
+const ISO_PROJ = Math.SQRT1_2;
+const PLAY_VIEW = 11.5;          // vertical world units visible while playing
+const MAX_FIT_VIEW = 70;         // cap on the game-over pull-back
+const SHADOW_DEPTH = 26;         // blocks further below the top stop casting shadows
+const TAP_DEBOUNCE_MS = 110;     // swallows a fat-fingered double tap, invisible to real play
+
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+// ── State ──
+let gameState = 'menu';          // 'menu' | 'playing' | 'gameOver'
+let blocks = [];                 // placed blocks, bottom-up
+let foundation = [];             // decorative, not part of gameplay
+let current = null;              // the block currently sliding
+let debris = [];                 // sliced-off pieces falling away
+let effects = [];                // perfect-drop rings
+let score = 0;
+let combo = 0;
+let inputLockUntil = 0;
+let overlayTimer = null;
+let highScore = readHighScore();
+
+function readHighScore() {
+  try {
+    const stored = parseInt(localStorage.getItem('towerStackHighScore'), 10);
+    return Number.isFinite(stored) && stored > 0 ? stored : 0;
+  } catch (e) {
+    return 0; // storage blocked (private mode / third-party cookie rules)
+  }
+}
+
+// Camera follows the top of the tower.
+let camX = 0, camY = 0, camZ = 0;
+let camTargetX = 0, camTargetY = 0, camTargetZ = 0;
+let viewSize = PLAY_VIEW, viewSizeTarget = PLAY_VIEW;
+// Actual world units spanned by the frustum, after the portrait widening below.
+let viewV = PLAY_VIEW, viewH = MIN_VIEW_H;
+
+// ── Audio (Web Audio API — no files needed) ──
+let audioCtx = null;
+
+function initAudio() {
+  if (audioCtx) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return;
+  }
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) {
+    audioCtx = null;
+  }
+}
+
+function playTone(freq, dur, type, vol, delay) {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime + (delay || 0);
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'square';
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.03);
+}
+
+function playDrop(level) {
+  playTone(140 + (level % 10) * 16, 0.14, 'triangle', 0.09, 0);
+}
+
+function playPerfect(n) {
+  const base = 520 * Math.pow(1.06, Math.min(n, 10));
+  playTone(base, 0.1, 'square', 0.06, 0);
+  playTone(base * 1.5, 0.18, 'square', 0.05, 0.07);
+}
+
+function playFail() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(320, t0);
+  osc.frequency.exponentialRampToValueAtTime(70, t0 + 0.6);
+  gain.gain.setValueAtTime(0.09, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.65);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.7);
+}
+
+// ── Three.js setup ──
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.insertBefore(renderer.domElement, container.firstChild);
+
+const scene = new THREE.Scene();
+
+// Orthographic gives the clean isometric look and keeps block sizes readable
+// no matter how tall the tower gets.
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 400);
+const CAM_DIR = new THREE.Vector3(1, 0.82, 1).normalize();
+const CAM_DIST = 120;
+
+const hemiLight = new THREE.HemisphereLight(0xbcd0ff, 0x2a2350, 1.15);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff4e6, 1.7);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(1024, 1024);
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 140;
+sunLight.shadow.camera.left = -18;
+sunLight.shadow.camera.right = 18;
+sunLight.shadow.camera.top = 22;
+sunLight.shadow.camera.bottom = -22;
+sunLight.shadow.bias = -0.0015;
+scene.add(sunLight);
+scene.add(sunLight.target);
+
+// One shared unit cube — blocks are sized with scale, so slicing never
+// rebuilds geometry.
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const ringGeo = new THREE.RingGeometry(0.52, 0.62, 40);
+
+function blockColor(level) {
+  return new THREE.Color().setHSL((((level * 9) % 360) + 360) % 360 / 360, 0.62, 0.62);
+}
+
+function createMesh(sizeX, sizeZ, color, castShadow) {
+  const mesh = new THREE.Mesh(unitBox, new THREE.MeshStandardMaterial({
+    color: color, roughness: 0.62, metalness: 0.06,
+  }));
+  mesh.scale.set(sizeX, BLOCK_HEIGHT, sizeZ);
+  mesh.castShadow = castShadow !== false;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
+function disposeMesh(mesh) {
+  scene.remove(mesh);
+  if (mesh.material) mesh.material.dispose();
+}
+
+// ── Camera ──
+function updateFrustum() {
+  const aspect = window.innerWidth / window.innerHeight;
+  let v = viewSize;
+  let h = v * aspect;
+  if (h < MIN_VIEW_H) { h = MIN_VIEW_H; v = MIN_VIEW_H / aspect; }
+  viewV = v;
+  viewH = h;
+  camera.left = -h / 2;
+  camera.right = h / 2;
+  camera.top = v / 2;
+  camera.bottom = -v / 2;
+  camera.updateProjectionMatrix();
+}
+
+// Furthest the sliding block may travel while staying fully on screen.
+function maxAmplitude(size) {
+  const halfBlockOnScreen = (size.x + size.z) * 0.5 * ISO_PROJ;
+  return Math.max(2, (viewH / 2 - halfBlockOnScreen - 0.3) / ISO_PROJ);
+}
+
+function applyCamera() {
+  camera.position.set(
+    camX + CAM_DIR.x * CAM_DIST,
+    camY + CAM_DIR.y * CAM_DIST,
+    camZ + CAM_DIR.z * CAM_DIST
+  );
+  camera.lookAt(camX, camY, camZ);
+  sunLight.position.set(camX + 18, camY + 34, camZ + 14);
+  sunLight.target.position.set(camX, camY, camZ);
+}
+
+function focusOnTop(snap) {
+  const top = blocks[blocks.length - 1];
+  viewSizeTarget = PLAY_VIEW;
+  // Restore the play frustum before framing, so camTargetY is derived from the
+  // view we are about to have rather than a leftover game-over pull-back.
+  if (snap) { viewSize = viewSizeTarget; updateFrustum(); }
+  camTargetX = top.pos.x;
+  camTargetZ = top.pos.z;
+  // Sit the top of the tower a little above centre: the incoming block swings
+  // upward on the isometric diagonal, so the headroom above is still enough,
+  // and more of the tower you have built stays in frame below. Scaled to the
+  // frustum so tall portrait viewports get the same proportional framing.
+  camTargetY = top.y - viewV * 0.09;
+  if (snap) {
+    camX = camTargetX; camY = camTargetY; camZ = camTargetZ;
+    applyCamera();
+  }
+}
+
+// ── HUD ──
+function updateHud() {
+  scoreEl.textContent = String(score);
+  bestEl.textContent = 'Best ' + highScore;
+}
+
+function showCombo(n) {
+  comboFlashEl.textContent = n > 1 ? 'PERFECT ×' + n : 'PERFECT!';
+  comboFlashEl.classList.remove('show');
+  void comboFlashEl.offsetWidth; // restart the CSS animation
+  comboFlashEl.classList.add('show');
+}
+
+// ── Block lifecycle ──
+function clearWorld() {
+  blocks.forEach(b => disposeMesh(b.mesh));
+  foundation.forEach(m => disposeMesh(m));
+  debris.forEach(d => disposeMesh(d.mesh));
+  effects.forEach(fx => disposeMesh(fx.mesh));
+  if (current) disposeMesh(current.mesh);
+  blocks = [];
+  foundation = [];
+  debris = [];
+  effects = [];
+  current = null;
+}
+
+function spawnBlock() {
+  const prev = blocks[blocks.length - 1];
+  const level = blocks.length;
+  const axis = level % 2 === 1 ? 'x' : 'z';
+  const amplitude = Math.min(prev.size[axis] / 2 + AMPLITUDE_PAD, maxAmplitude(prev.size));
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  const pos = { x: prev.pos.x, z: prev.pos.z };
+  pos[axis] = prev.pos[axis] - dir * amplitude;
+
+  const mesh = createMesh(prev.size.x, prev.size.z, blockColor(level));
+  mesh.position.set(pos.x, prev.y + BLOCK_HEIGHT, pos.z);
+
+  current = {
+    mesh: mesh,
+    axis: axis,
+    dir: dir,
+    size: { x: prev.size.x, z: prev.size.z },
+    pos: pos,
+    y: prev.y + BLOCK_HEIGHT,
+    level: level,
+    speed: Math.min(BASE_SPEED + level * SPEED_STEP, MAX_SPEED),
+    min: prev.pos[axis] - amplitude,
+    max: prev.pos[axis] + amplitude,
+  };
+}
+
+function addDebris(mesh, pushDir, axis) {
+  const vel = { x: 0, z: 0 };
+  if (axis) vel[axis] = pushDir * (1.4 + Math.random() * 1.2);
+  debris.push({
+    mesh: mesh,
+    vy: 1.5,
+    vx: vel.x,
+    vz: vel.z,
+    rx: (Math.random() - 0.5) * 4,
+    rz: (Math.random() - 0.5) * 4,
+  });
+}
+
+function spawnPerfectRing(x, y, z, size) {
+  const mesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+    color: 0xffe27a, transparent: true, opacity: 0.95,
+    side: THREE.DoubleSide, depthWrite: false,
+  }));
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(x, y + BLOCK_HEIGHT / 2 + 0.03, z);
+  const s = size * 1.1;
+  mesh.scale.set(s, s, s);
+  scene.add(mesh);
+  effects.push({ mesh: mesh, life: 0, dur: 0.55, base: s });
+}
+
+function drop() {
+  const prev = blocks[blocks.length - 1];
+  const axis = current.axis;
+  const size = prev.size[axis];
+  const delta = current.pos[axis] - prev.pos[axis];
+  const absDelta = Math.abs(delta);
+
+  // Missed the tower entirely — the whole block falls away.
+  if (absDelta >= size) {
+    const missed = current;
+    current = null;
+    addDebris(missed.mesh, Math.sign(delta) || 1, axis);
+    gameOver();
+    return;
+  }
+
+  const perfect = absDelta < PERFECT_EPS;
+  let newSize = perfect ? size : size - absDelta;
+  const newCenter = perfect ? prev.pos[axis] : prev.pos[axis] + delta / 2;
+
+  if (perfect) {
+    combo += 1;
+    score += 3;
+    if (combo % PERFECTS_PER_GROW === 0) {
+      newSize = Math.min(BASE_SIZE, newSize + PERFECT_GROW);
+    }
+    // A perfect drop lands exactly on the block below, so reuse its centre.
+    spawnPerfectRing(prev.pos.x, current.y, prev.pos.z, Math.max(current.size.x, current.size.z));
+    showCombo(combo);
+    playPerfect(combo);
+  } else {
+    combo = 0;
+    score += 1;
+    // The overhang becomes a separate falling piece.
+    const offSize = { x: current.size.x, z: current.size.z };
+    offSize[axis] = absDelta;
+    const offCenter = { x: current.pos.x, z: current.pos.z };
+    offCenter[axis] = newCenter + Math.sign(delta) * (newSize + absDelta) / 2;
+
+    const offMesh = createMesh(offSize.x, offSize.z, current.mesh.material.color.clone());
+    offMesh.position.set(offCenter.x, current.y, offCenter.z);
+    addDebris(offMesh, Math.sign(delta), axis);
+    playDrop(current.level);
+  }
+
+  current.size[axis] = newSize;
+  current.pos[axis] = newCenter;
+  current.mesh.scale.set(current.size.x, BLOCK_HEIGHT, current.size.z);
+  current.mesh.position.set(current.pos.x, current.y, current.pos.z);
+
+  blocks.push({ mesh: current.mesh, size: current.size, pos: current.pos, y: current.y });
+  current = null;
+
+  // Keep the shadow pass cheap on tall towers.
+  const shadowCutoff = blocks.length - 1 - Math.ceil(SHADOW_DEPTH / BLOCK_HEIGHT);
+  if (shadowCutoff >= 0) blocks[shadowCutoff].mesh.castShadow = false;
+
+  updateHud();
+  spawnBlock();
+  focusOnTop(false);
+}
+
+// ── Game flow ──
+function resetGame() {
+  clearWorld();
+  score = 0;
+  combo = 0;
+
+  for (let i = 0; i < FOUNDATION_BLOCKS; i++) {
+    const mesh = createMesh(BASE_SIZE, BASE_SIZE, new THREE.Color().setHSL(0.68, 0.28, 0.34 - i * 0.05), false);
+    mesh.position.set(0, -BLOCK_HEIGHT * (i + 1), 0);
+    foundation.push(mesh);
+  }
+
+  const baseMesh = createMesh(BASE_SIZE, BASE_SIZE, blockColor(0));
+  baseMesh.position.set(0, 0, 0);
+  blocks.push({ mesh: baseMesh, size: { x: BASE_SIZE, z: BASE_SIZE }, pos: { x: 0, z: 0 }, y: 0 });
+
+  spawnBlock();
+  focusOnTop(true);
+  updateHud();
+}
+
+function startGame() {
+  if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+  // Straight off the title screen the board is already fresh, so leave the
+  // block where the attract loop put it rather than snapping it back.
+  const alreadyFresh = gameState === 'menu' && blocks.length === 1 && score === 0;
+  if (!alreadyFresh) resetGame();
+  gameState = 'playing';
+  overlayEl.classList.add('is-hidden');
+  inputLockUntil = performance.now() + 250;
+  startBtn.blur();
+}
+
+function gameOver() {
+  gameState = 'gameOver';
+  playFail();
+
+  const isNewBest = score > highScore;
+  if (isNewBest) {
+    highScore = score;
+    try { localStorage.setItem('towerStackHighScore', String(highScore)); } catch (e) { /* private mode */ }
+  }
+  updateHud();
+
+  // Pull the camera back so the whole tower is visible behind the overlay.
+  const top = blocks[blocks.length - 1];
+  const fitted = Math.min(Math.max(top.y + 8, PLAY_VIEW), MAX_FIT_VIEW);
+  viewSizeTarget = fitted;
+  camTargetX = top.pos.x / 2; // split the difference between the base and the top
+  camTargetZ = top.pos.z / 2;
+  // Centre the whole tower, unless it is taller than the pull-back can fit —
+  // then frame the top of it instead.
+  camTargetY = Math.max(top.y / 2, top.y - fitted / 2 + 4);
+
+  inputLockUntil = performance.now() + 900;
+  overlayTimer = setTimeout(() => {
+    overlayTimer = null;
+    titleLeadEl.textContent = isNewBest ? 'New' : 'Game';
+    titleAccentEl.textContent = isNewBest ? 'Best!' : 'Over';
+    overlayMsgEl.textContent = isNewBest
+      ? 'Your tallest tower yet. Can you go higher?'
+      : 'That block missed the tower completely. Try again?';
+    finalScoreEl.textContent = String(score);
+    finalHeightEl.textContent = String(blocks.length - 1);
+    finalBestEl.textContent = String(highScore);
+    statsRowEl.classList.remove('hidden');
+    startBtn.textContent = 'Play Again';
+    controlsHintEl.textContent = isTouch
+      ? 'Tap anywhere to play again'
+      : 'Press Space or click to play again';
+    overlayEl.classList.remove('is-hidden');
+  }, 750);
+}
+
+// ── Per-frame updates ──
+function updateCurrent(dt) {
+  if (!current) return;
+  const axis = current.axis;
+  current.pos[axis] += current.dir * current.speed * dt;
+  if (current.pos[axis] > current.max) {
+    current.pos[axis] = current.max;
+    current.dir = -1;
+  } else if (current.pos[axis] < current.min) {
+    current.pos[axis] = current.min;
+    current.dir = 1;
+  }
+  current.mesh.position.set(current.pos.x, current.y, current.pos.z);
+}
+
+function updateDebris(dt) {
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i];
+    d.vy -= GRAVITY * dt;
+    d.mesh.position.x += d.vx * dt;
+    d.mesh.position.y += d.vy * dt;
+    d.mesh.position.z += d.vz * dt;
+    d.mesh.rotation.x += d.rx * dt;
+    d.mesh.rotation.z += d.rz * dt;
+    if (d.mesh.position.y < camY - viewSize) {
+      disposeMesh(d.mesh);
+      debris.splice(i, 1);
+    }
+  }
+}
+
+function updateEffects(dt) {
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const fx = effects[i];
+    fx.life += dt;
+    const t = fx.life / fx.dur;
+    if (t >= 1) {
+      disposeMesh(fx.mesh);
+      effects.splice(i, 1);
+      continue;
+    }
+    const s = fx.base * (1 + t * 1.5);
+    fx.mesh.scale.set(s, s, s);
+    fx.mesh.material.opacity = 0.95 * (1 - t);
+  }
+}
+
+function updateCamera(dt) {
+  const k = 1 - Math.exp(-6 * dt);
+  camX += (camTargetX - camX) * k;
+  camY += (camTargetY - camY) * k;
+  camZ += (camTargetZ - camZ) * k;
+
+  if (Math.abs(viewSizeTarget - viewSize) > 0.01) {
+    viewSize += (viewSizeTarget - viewSize) * (1 - Math.exp(-4 * dt));
+    updateFrustum();
+  }
+  applyCamera();
+}
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // The block also slides behind the title screen, as an attract loop that
+  // previews the mechanic instead of hanging frozen in mid-air.
+  if (gameState === 'playing' || gameState === 'menu') updateCurrent(dt);
+  updateDebris(dt);
+  updateEffects(dt);
+  updateCamera(dt);
+
+  renderer.render(scene, camera);
+}
+
+// ── Input — the whole screen is the drop button ──
+function handleAction() {
+  initAudio();
+  if (performance.now() < inputLockUntil) return;
+  if (gameState === 'playing') {
+    if (!current) return;
+    // Set the debounce before dropping, so a game-over lock set inside drop()
+    // takes precedence rather than being overwritten by this shorter one.
+    inputLockUntil = performance.now() + TAP_DEBOUNCE_MS;
+    drop();
+  } else {
+    startGame();
+  }
+}
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'ArrowDown') {
+    e.preventDefault();
+    handleAction();
+  }
+});
+
+container.addEventListener('pointerdown', e => {
+  if (e.target.closest('a, button')) return; // let the HUD link and buttons work
+  if (!e.isPrimary) return;                  // a second finger must not drop a second block
+  e.preventDefault();
+  handleAction();
+}, { passive: false });
+
+startBtn.addEventListener('click', () => {
+  initAudio();
+  startGame();
+});
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateFrustum();
+  // Re-frame for the new aspect, but never fight the game-over pull-back.
+  if (gameState !== 'gameOver' && blocks.length) focusOnTop(false);
+});
+
+if (isTouch) controlsHintEl.textContent = 'Tap anywhere to drop';
+
+// ── Init ──
+updateFrustum();
+resetGame();
+animate();
+</script>
+</body>
+</html>
