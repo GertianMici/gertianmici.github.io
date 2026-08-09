@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+<title>Ship It</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #131a24;
+    --line: rgba(255,255,255,0.08);
+    --dim: rgba(255,255,255,0.44);
+    --text: #d6e0ea;
+    --green: #7ee787;
+    --blue: #79c0ff;
+    --purple: #d2a8ff;
+    --orange: #ffa657;
+    --pink: #ff7b9c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { overscroll-behavior: none; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh; height: 100dvh;
+    width: 100vw;
+    font-family: var(--mono);
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* overflow:hidden on both is a guarantee: whatever the panel's contents add
+     up to, the page itself never gains a scrollbar. */
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+
+  /* ── Top bar ── */
+  #top {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line);
+    background: #0b1017;
+  }
+  #backLink {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--dim); text-decoration: none; font-size: 13px; font-weight: 600;
+    padding: 7px 12px; border-radius: 7px;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.04);
+    transition: color 0.15s, background 0.15s;
+  }
+  #backLink:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+  #counters { text-align: right; line-height: 1.15; }
+  #loc { font-size: 26px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; }
+  #loc small { font-size: 12px; color: var(--dim); font-weight: 600; margin-left: 3px; }
+  #rate { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+  /* ── Body split ── */
+  #main { flex: 1 1 auto; display: flex; min-height: 0; }
+  #left {
+    flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  /* Editor pane */
+  /* Aligning to the end keeps the newest line pinned to the bottom and lets the
+     older ones fall off the top. Growing from the top instead would push fresh
+     lines out of sight the moment the buffer was taller than the pane. */
+  #editor {
+    flex: 1 1 auto; min-height: 0; overflow: hidden; position: relative;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    background: #0a0e14; padding: 10px 12px;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  #editor::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(10,14,20,0.96) 0%, transparent 22%);
+  }
+  #code { display: flex; flex-direction: column; flex: 0 0 auto; }
+  .ln { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+  .ln .n { color: rgba(255,255,255,0.16); margin-right: 10px; }
+  .kw { color: var(--pink); }
+  .fn { color: var(--purple); }
+  .st { color: var(--blue); }
+  .nu { color: var(--orange); }
+  .cm { color: rgba(255,255,255,0.28); }
+
+  /* Write button */
+  #writeWrap { flex: 0 0 auto; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  #writeBtn {
+    width: 100%; padding: 16px; border-radius: 10px; cursor: pointer;
+    font-family: var(--mono); font-size: 15px; font-weight: 700; color: #06120a;
+    background: linear-gradient(135deg, #7ee787 0%, #3fb950 100%);
+    border: none; box-shadow: 0 6px 20px rgba(63, 185, 80, 0.22);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: transform 0.08s ease, box-shadow 0.15s;
+  }
+  #writeBtn:hover { box-shadow: 0 8px 26px rgba(63, 185, 80, 0.32); }
+  #writeBtn:active { transform: translateY(2px); }
+  #clickGain {
+    font-size: 13px; font-weight: 800; padding: 3px 9px; border-radius: 999px;
+    background: rgba(0,0,0,0.22);
+  }
+
+  /* ── Side panel ── */
+  #side {
+    flex: 0 0 380px; display: flex; flex-direction: column;
+    background: var(--panel); min-height: 0; overflow: hidden;
+  }
+  #tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tab-btn {
+    flex: 1; padding: 12px 4px; cursor: pointer; position: relative;
+    font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    color: var(--dim); background: transparent; border: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn[aria-pressed="true"] { color: var(--green); border-bottom-color: var(--green); }
+  .dot {
+    display: none; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--orange); position: absolute; top: 8px; right: 12px;
+  }
+  .dot.on { display: block; }
+
+  #buyModes { display: flex; gap: 5px; padding: 8px 8px 0; }
+  .mode {
+    flex: 1; padding: 7px 0; border-radius: 6px; cursor: pointer;
+    font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--dim);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--line);
+  }
+  .mode:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+  .mode[aria-pressed="true"] { background: rgba(126,231,135,0.16); border-color: rgba(126,231,135,0.5); color: var(--green); }
+
+  .list { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px; min-height: 0; }
+  .list.hidden { display: none; }
+
+  .row {
+    display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;
+    width: 100%; text-align: left; cursor: pointer;
+    padding: 9px 10px; margin-bottom: 6px; border-radius: 9px;
+    font-family: var(--mono); color: var(--text);
+    background: rgba(255,255,255,0.035); border: 1px solid var(--line);
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  }
+  .row:hover:not(:disabled) { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
+  .row:disabled { cursor: not-allowed; opacity: 0.4; }
+  .row.can { border-color: rgba(126,231,135,0.45); }
+  .ic { font-size: 18px; text-align: center; line-height: 1; }
+  .nm { font-size: 13px; font-weight: 700; line-height: 1.25; }
+  .sb { font-size: 11px; color: var(--dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .rt { text-align: right; }
+  .pr { font-size: 12px; font-weight: 700; color: var(--orange); font-variant-numeric: tabular-nums; }
+  .row.can .pr { color: var(--green); }
+  .ow { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+  /* Shipped projects */
+  .ship {
+    display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center;
+    padding: 9px 10px; margin-bottom: 6px; border-radius: 9px;
+    background: rgba(255,255,255,0.035); border: 1px solid var(--line);
+    color: var(--text); text-decoration: none;
+  }
+  .ship.locked { opacity: 0.38; }
+  .ship.done { border-color: rgba(121,192,255,0.4); background: rgba(121,192,255,0.07); }
+  .ship.done:hover { background: rgba(121,192,255,0.14); }
+  .ship .nm { font-size: 12.5px; }
+  .ship .go { font-size: 11px; font-weight: 700; color: var(--blue); }
+  .ship .req { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  #shippedNote { font-size: 11px; color: var(--dim); padding: 4px 4px 10px; line-height: 1.5; }
+
+  #foot { flex: 0 0 auto; border-top: 1px solid var(--line); padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  #craftLine { font-size: 11.5px; color: var(--dim); display: flex; justify-content: space-between; margin-bottom: 8px; }
+  #craftLine b { color: var(--purple); }
+  #refactorBtn {
+    width: 100%; padding: 11px; border-radius: 8px; cursor: pointer;
+    font-family: var(--mono); font-size: 13px; font-weight: 800; color: #17092b;
+    background: linear-gradient(135deg, #d2a8ff 0%, #a371f7 100%); border: none;
+  }
+  #refactorBtn:disabled {
+    cursor: not-allowed; opacity: 0.35; background: rgba(255,255,255,0.08); color: var(--dim);
+  }
+
+  /* Floating +LOC */
+  .pop {
+    position: fixed; z-index: 30; pointer-events: none;
+    font-size: 14px; font-weight: 800; color: var(--green);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+    animation: rise 0.85s ease-out forwards;
+  }
+  @keyframes rise {
+    0% { opacity: 0; transform: translate(-50%, 0); }
+    20% { opacity: 1; transform: translate(-50%, -8px); }
+    100% { opacity: 0; transform: translate(-50%, -40px); }
+  }
+
+  /* Modal */
+  #modal {
+    position: fixed; inset: 0; z-index: 40; padding: 22px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(3, 6, 10, 0.8); backdrop-filter: blur(3px);
+  }
+  #modal.hidden { display: none; }
+  #card {
+    max-width: 380px; width: 100%; text-align: center;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px 22px;
+  }
+  #cardTitle { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+  #cardTitle span { color: var(--green); }
+  #cardSub { font-size: 12px; color: var(--dim); margin-bottom: 14px; }
+  #cardAmount { font-size: 28px; font-weight: 800; color: var(--green); font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+  #cardNote { font-size: 11.5px; color: var(--dim); margin-bottom: 18px; line-height: 1.5; }
+  #cardBtn {
+    padding: 12px 34px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: var(--mono); font-size: 14px; font-weight: 700; color: #06120a;
+    background: linear-gradient(135deg, #7ee787 0%, #3fb950 100%);
+  }
+
+  /* ── Narrow *and* tall: stack the panel under the editor ──
+     Height is part of the test on purpose. A landscape phone is narrow enough
+     to trip a width-only breakpoint, but stacking there leaves the panel about
+     180px tall — not enough for the tabs, the list and the footer at 44px tap
+     targets, so it overflowed. Landscape keeps the side-by-side layout, which
+     gives the panel the full height instead. */
+  @media (max-width: 860px) and (min-height: 500px) {
+    #main { flex-direction: column; }
+    #left { flex: 0 0 auto; border-right: none; border-bottom: 1px solid var(--line); }
+    #editor { flex: 0 0 auto; height: 116px; }
+    #side { flex: 1 1 auto; min-height: 0; }
+    #loc { font-size: 22px; }
+    #top { padding: 8px 12px; }
+    #writeWrap { padding: 8px 10px; }
+    #writeBtn { padding: 14px; font-size: 14px; }
+  }
+  /* Short and wide: side by side, but give the editor less room. */
+  @media (max-width: 860px) and (max-height: 499px) {
+    #side { flex-basis: 300px; }
+    #top { padding: 6px 12px; }
+    #loc { font-size: 20px; }
+    #writeWrap { padding: 8px 10px; }
+  }
+
+  /* Touch devices: 44px tap targets, last so size queries cannot shrink them. */
+  @media (pointer: coarse) {
+    #backLink { min-height: 44px; padding: 10px 16px; font-size: 14px; }
+    .tab-btn { min-height: 46px; }
+    .mode { min-height: 44px; font-size: 13px; }
+    .row { min-height: 52px; }
+    .ship { min-height: 52px; }
+    #refactorBtn { min-height: 46px; }
+    #cardBtn { min-height: 46px; }
+    #writeBtn { min-height: 56px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <a id="backLink" href="/#/games" target="_top">&#8592; Arcade</a>
+    <div id="counters">
+      <div id="loc">0<small>LOC</small></div>
+      <div id="rate">0 / sec &middot; +1 per commit</div>
+    </div>
+  </header>
+
+  <div id="main">
+    <section id="left">
+      <div id="editor"><div id="code"></div></div>
+      <div id="writeWrap">
+        <button id="writeBtn" type="button">
+          <span>Write Code</span><span id="clickGain">+1</span>
+        </button>
+      </div>
+    </section>
+
+    <aside id="side">
+      <div id="tabs">
+        <button class="tab-btn" type="button" data-tab="team" aria-pressed="true">TEAM</button>
+        <button class="tab-btn" type="button" data-tab="upgrades" aria-pressed="false">UPGRADES<span class="dot" id="upgDot"></span></button>
+        <button class="tab-btn" type="button" data-tab="shipped" aria-pressed="false">SHIPPED<span class="dot" id="shipDot"></span></button>
+      </div>
+
+      <div id="buyModes">
+        <button class="mode" type="button" data-buy="1" aria-pressed="true">&times;1</button>
+        <button class="mode" type="button" data-buy="10" aria-pressed="false">&times;10</button>
+        <button class="mode" type="button" data-buy="max" aria-pressed="false">MAX</button>
+      </div>
+
+      <div class="list" id="teamList"></div>
+      <div class="list hidden" id="upgradesList"></div>
+      <div class="list hidden" id="shippedList"></div>
+
+      <footer id="foot">
+        <div id="craftLine">
+          <span>Craft <b id="craftOwned">0</b> &middot; +<b id="craftBonus">0%</b> output</span>
+          <span id="craftGain">+0 next</span>
+        </div>
+        <button id="refactorBtn" type="button" disabled>Refactor</button>
+      </footer>
+    </aside>
+  </div>
+</div>
+
+<div id="modal" class="hidden">
+  <div id="card">
+    <div id="cardTitle">Welcome <span>back</span></div>
+    <div id="cardSub">You were away for 0m</div>
+    <div id="cardAmount">+0 LOC</div>
+    <div id="cardNote">The build kept running the whole time.</div>
+    <button id="cardBtn" type="button">Pull changes</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── DOM ──
+const locEl = document.getElementById('loc');
+const rateEl = document.getElementById('rate');
+const codeEl = document.getElementById('code');
+const writeBtn = document.getElementById('writeBtn');
+const clickGainEl = document.getElementById('clickGain');
+const tabsEl = document.getElementById('tabs');
+const buyModesEl = document.getElementById('buyModes');
+const teamListEl = document.getElementById('teamList');
+const upgradesListEl = document.getElementById('upgradesList');
+const shippedListEl = document.getElementById('shippedList');
+const upgDotEl = document.getElementById('upgDot');
+const shipDotEl = document.getElementById('shipDot');
+const craftOwnedEl = document.getElementById('craftOwned');
+const craftBonusEl = document.getElementById('craftBonus');
+const craftGainEl = document.getElementById('craftGain');
+const refactorBtn = document.getElementById('refactorBtn');
+const modalEl = document.getElementById('modal');
+const cardTitleEl = document.getElementById('cardTitle');
+const cardSubEl = document.getElementById('cardSub');
+const cardAmountEl = document.getElementById('cardAmount');
+const cardNoteEl = document.getElementById('cardNote');
+const cardBtn = document.getElementById('cardBtn');
+
+// ── Config ──
+const SAVE_KEY = 'shipItSave';
+const SAVE_VERSION = 1;
+const COST_GROWTH = 1.15;
+const CRAFT_BONUS = 0.02;      // per craft point
+
+// Hires. Costs compound, so each tier carries the run until the next one lands.
+const HIRES = [
+  { id: 'coffee',  name: 'Coffee',        icon: '☕', cost: 15,     rate: 0.1 },
+  { id: 'junior',  name: 'Junior Dev',    icon: '⌨', cost: 110,    rate: 1 },
+  { id: 'senior',  name: 'Senior Dev',    icon: '\u{1F9E0}', cost: 1300, rate: 8 },
+  { id: 'ci',      name: 'CI Pipeline',   icon: '♻', cost: 15000,  rate: 55 },
+  { id: 'agent',   name: 'AI Agent',      icon: '\u{1F916}', cost: 180000, rate: 340 },
+  { id: 'team',    name: 'Whole Team',    icon: '\u{1F3E2}', cost: 2.2e6, rate: 2100 },
+  { id: 'oss',     name: 'Open Source',   icon: '\u{1F310}', cost: 3.1e7, rate: 15000 },
+  { id: 'cluster', name: 'Build Cluster', icon: '\u{1F6F0}', cost: 4.6e8, rate: 120000 },
+  { id: 'agi',     name: 'Self-Hosting',  icon: '\u{1F9EC}', cost: 8.2e9, rate: 1.1e6 },
+];
+
+// Upgrades are one-off purchases. `target` -1 means "everything".
+const UPGRADES = [
+  { id: 'kb',    name: 'Mechanical Keyboard', desc: 'Commits write twice as much', cost: 400,   kind: 'click', mult: 2 },
+  { id: 'iv',    name: 'Caffeine IV',         desc: 'Coffee x3',                   cost: 1200,  kind: 'gen', target: 0, mult: 3 },
+  { id: 'dual',  name: 'Dual Monitors',       desc: 'Commits write twice as much', cost: 6000,  kind: 'click', mult: 2 },
+  { id: 'pair',  name: 'Pair Programming',    desc: 'Junior Devs x3',              cost: 9000,  kind: 'gen', target: 1, mult: 3 },
+  { id: 'rev',   name: 'Code Review',         desc: 'Senior Devs x3',              cost: 90000, kind: 'gen', target: 2, mult: 3 },
+  { id: 'types', name: 'Static Types',        desc: 'Everything x1.25',            cost: 600000, kind: 'all', mult: 1.25 },
+  { id: 'cache', name: 'Build Cache',         desc: 'CI Pipelines x3',             cost: 1.6e6, kind: 'gen', target: 3, mult: 3 },
+  { id: 'ctx',   name: 'Bigger Context',      desc: 'AI Agents x3',                cost: 2.4e7, kind: 'gen', target: 4, mult: 3 },
+  { id: 'hot',   name: 'Hot Reload',          desc: 'Everything x1.25',            cost: 3.5e8, kind: 'all', mult: 1.25 },
+  { id: 'mono',  name: 'Monorepo',            desc: 'Everything x1.5',             cost: 9e9,   kind: 'all', mult: 1.5 },
+  { id: 'boot',  name: 'Self-Hosting Compiler', desc: 'Everything x2',             cost: 4e11,  kind: 'all', mult: 2 },
+];
+
+// Milestones are the real portfolio. Shipping one is permanent — it survives a
+// refactor — and each adds a slice of global output.
+const PROJECTS = [
+  { id: 'llama',  name: 'Llama Derby',     icon: '\u{1F999}', at: 1500,   href: '/#/llama-race',      bonus: 0.10 },
+  { id: 'pac',    name: 'Pac-Girl',        icon: '\u{1F47E}', at: 40000,  href: '/#/pac-girl',        bonus: 0.10 },
+  { id: 'car',    name: 'Road Racer 3D',   icon: '\u{1F697}', at: 750000, href: '/#/car-race',        bonus: 0.12 },
+  { id: 'horse',  name: 'Horse Racer 3D',  icon: '\u{1F40E}', at: 9e6,    href: '/#/horse-race',      bonus: 0.12 },
+  { id: 'chess',  name: '3D Chess',        icon: '♟',    at: 1.1e8,  href: '/#/chess-3d',        bonus: 0.15 },
+  { id: 'tower',  name: 'Tower Stack 3D',  icon: '\u{1F5FC}', at: 1.6e9,  href: '/#/tower-stack',     bonus: 0.15 },
+  { id: 'sand',   name: 'Falling Sand',    icon: '⏳',    at: 2.6e10, href: '/#/falling-sand',    bonus: 0.18 },
+  { id: 'city',   name: 'Idle Metropolis', icon: '\u{1F303}', at: 4.2e11, href: '/#/idle-metropolis', bonus: 0.18 },
+  { id: 'helk',   name: 'Helkost (iOS)',   icon: '\u{1F4F1}', at: 7e12,   href: '/helkost/',          bonus: 0.25 },
+  { id: 'osrev',  name: 'OsreveR (iOS)',   icon: '\u{1F504}', at: 1.2e14, href: '/osrever/',          bonus: 0.25 },
+];
+
+// ── State ──
+let loc = 0;
+let runLoc = 0;        // written this run, drives the refactor payout
+let allTimeLoc = 0;    // never resets, drives project milestones
+let peakLoc = 0;       // most ever held this run, drives hire reveals
+let counts = HIRES.map(() => 0);
+let owned = {};        // upgrade id -> true
+let shipped = 0;       // how many projects have been shipped
+let craft = 0;
+let refactors = 0;
+let buyMode = 1;
+let activeTab = 'team';
+
+// ── Derived ──
+function clickMult() {
+  let m = 1;
+  UPGRADES.forEach(u => { if (owned[u.id] && u.kind === 'click') m *= u.mult; });
+  return m;
+}
+function allMult() {
+  let m = 1;
+  UPGRADES.forEach(u => { if (owned[u.id] && u.kind === 'all') m *= u.mult; });
+  return m;
+}
+function genMult(i) {
+  let m = 1;
+  UPGRADES.forEach(u => { if (owned[u.id] && u.kind === 'gen' && u.target === i) m *= u.mult; });
+  return m;
+}
+function shipMult() {
+  let m = 1;
+  for (let i = 0; i < shipped; i++) m *= 1 + PROJECTS[i].bonus;
+  return m;
+}
+const globalMult = () => allMult() * shipMult() * (1 + CRAFT_BONUS * craft);
+
+function locPerSec() {
+  let sum = 0;
+  for (let i = 0; i < HIRES.length; i++) sum += counts[i] * HIRES[i].rate * genMult(i);
+  return sum * globalMult();
+}
+// Clicking stays worth something late on by tracking a slice of the automated
+// rate, rather than being a rounding error next to it.
+const perClick = () => (1 + locPerSec() * 0.02) * clickMult() * globalMult();
+
+const costOf = (i, n) => HIRES[i].cost * Math.pow(COST_GROWTH, n);
+function bulkCost(i, k) {
+  if (k <= 0) return 0;
+  return costOf(i, counts[i]) * (Math.pow(COST_GROWTH, k) - 1) / (COST_GROWTH - 1);
+}
+function maxAffordable(i, budget) {
+  const first = costOf(i, counts[i]);
+  if (budget < first) return 0;
+  const k = Math.log(1 + (budget * (COST_GROWTH - 1)) / first) / Math.log(COST_GROWTH);
+  return Math.max(0, Math.floor(k + 1e-9));
+}
+const buyQty = i => (buyMode === 'max' ? maxAffordable(i, loc) : buyMode);
+
+const HIRE_REVEAL = 0.35;
+function hireRevealed(i) {
+  if (i === 0) return true;
+  if (counts[i] > 0) return true;
+  return peakLoc >= HIRES[i].cost * HIRE_REVEAL;
+}
+function upgradeRevealed(u) {
+  if (owned[u.id]) return false;                 // bought upgrades leave the list
+  return peakLoc >= u.cost * 0.4;
+}
+
+// ── Actions ──
+function addLoc(n) {
+  loc += n;
+  runLoc += n;
+  allTimeLoc += n;
+  if (loc > peakLoc) peakLoc = loc;
+}
+
+function hire(i) {
+  const k = buyQty(i);
+  if (k <= 0) return 0;
+  const cost = bulkCost(i, k);
+  if (cost > loc) return 0;
+  loc -= cost;
+  counts[i] += k;
+  pushLine(HIRES[i].id);
+  renderAll();
+  return k;
+}
+
+function buyUpgrade(id) {
+  const u = UPGRADES.find(x => x.id === id);
+  if (!u || owned[u.id] || u.cost > loc) return false;
+  loc -= u.cost;
+  owned[u.id] = true;
+  renderAll();
+  return true;
+}
+
+// Shipped count is always a function of lifetime lines, never a stored fact.
+// Trusting the saved number would let a tampered or corrupted save hand out
+// every project's bonus for free.
+function deriveShipped() {
+  shipped = 0;
+  while (shipped < PROJECTS.length && allTimeLoc >= PROJECTS[shipped].at) shipped += 1;
+}
+
+// Projects ship themselves once the lifetime line count passes their mark.
+function checkShipped() {
+  let newly = null;
+  while (shipped < PROJECTS.length && allTimeLoc >= PROJECTS[shipped].at) {
+    newly = PROJECTS[shipped];
+    shipped += 1;
+  }
+  if (newly) {
+    shipDotEl.classList.add('on');
+    pushLine('ship', newly.name);
+    renderAll();
+  }
+  return newly;
+}
+
+const pendingCraft = () => Math.floor(Math.sqrt(Math.max(0, runLoc) / 1e9));
+
+function refactor() {
+  const gain = pendingCraft();
+  if (gain < 1) return false;
+  craft += gain;
+  refactors += 1;
+  loc = 0;
+  runLoc = 0;
+  peakLoc = 0;
+  counts = HIRES.map(() => 0);
+  owned = {};
+  renderAll();
+  save();
+  showCard('Refactor', 'complete', `Rewrite #${refactors}`, '+' + fmt(gain) + ' craft',
+    `Shipped projects stay shipped. Everything else starts clean, at +${Math.round(CRAFT_BONUS * 100 * craft)}% output.`);
+  return true;
+}
+
+// ── Formatting ──
+const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+function fmt(n) {
+  if (!isFinite(n)) return '∞';
+  if (n < 0) return '-' + fmt(-n);
+  if (n < 1000) return n < 10 && n % 1 !== 0 ? n.toFixed(1) : String(Math.floor(n));
+  let t = Math.floor(Math.log10(n) / 3);
+  if (t >= SUF.length) t = SUF.length - 1;
+  const s = n / Math.pow(1000, t);
+  return s.toFixed(s >= 100 ? 0 : s >= 10 ? 1 : 2) + SUF[t];
+}
+function fmtDuration(sec) {
+  const s = Math.max(0, Math.floor(sec));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
+// ── The editor pane ──
+// Lines are cosmetic, but they are what makes the clicking feel like anything,
+// so they are themed to whatever the player just did.
+const NAMES = ['render', 'update', 'commit', 'resolve', 'dispatch', 'hydrate', 'reduce', 'parse', 'flush', 'mount'];
+const VARS = ['state', 'frame', 'ctx', 'payload', 'buffer', 'result', 'queue', 'entity', 'cache', 'delta'];
+const SNIPPETS = [
+  () => [['kw', 'const '], ['fn', pick(VARS)], ['', ' = '], ['fn', pick(NAMES)], ['', '('], ['nu', String(1 + (Math.random() * 99 | 0))], ['', ');']],
+  () => [['kw', 'function '], ['fn', pick(NAMES)], ['', '('], ['fn', pick(VARS)], ['', ') {']],
+  () => [['', '  '], ['kw', 'return '], ['fn', pick(VARS)], ['', '.'], ['fn', pick(NAMES)], ['', '();']],
+  () => [['kw', 'if '], ['', '('], ['fn', pick(VARS)], ['', ' > '], ['nu', String(Math.random() * 9 | 0)], ['', ') {']],
+  () => [['cm', '// TODO: ' + pick(['tidy this up', 'add a test', 'name this better', 'handle the edge case'])]],
+  () => [['kw', 'export default '], ['fn', pick(NAMES)], ['', ';']],
+  () => [['kw', 'await '], ['fn', pick(NAMES)], ['', '('], ['st', "'" + pick(VARS) + "'"], ['', ');']],
+  () => [['', '}']],
+];
+const pick = a => a[(Math.random() * a.length) | 0];
+
+let lineNo = 0;
+const MAX_LINES = 60;
+
+function pushLine(kind, label) {
+  let parts;
+  if (kind === 'ship') {
+    parts = [['cm', '// shipped: '], ['st', label]];
+  } else if (kind && kind !== 'code') {
+    const h = HIRES.find(x => x.id === kind);
+    parts = [['cm', '// hired: '], ['st', h ? h.name : kind]];
+  } else {
+    parts = pick(SNIPPETS)();
+  }
+  lineNo += 1;
+
+  const div = document.createElement('div');
+  div.className = 'ln';
+  const num = document.createElement('span');
+  num.className = 'n';
+  num.textContent = String(lineNo).padStart(4, ' ');
+  div.appendChild(num);
+  parts.forEach(([cls, text]) => {
+    const s = document.createElement('span');
+    if (cls) s.className = cls;
+    s.textContent = text;
+    div.appendChild(s);
+  });
+  codeEl.appendChild(div);
+  while (codeEl.childElementCount > MAX_LINES) codeEl.removeChild(codeEl.firstChild);
+}
+
+// Automated output writes lines too, but at a readable pace rather than one per
+// unit of income.
+let lineDebt = 0;
+function tickLines(dt) {
+  if (locPerSec() <= 0) return;
+  lineDebt += dt * Math.min(8, 1 + Math.log10(1 + locPerSec()));
+  while (lineDebt >= 1) { lineDebt -= 1; pushLine('code'); }
+}
+
+// ── Rendering ──
+const teamRows = [];
+function buildTeam() {
+  HIRES.forEach((h, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'row';
+    btn.dataset.hire = String(i);
+    const ic = document.createElement('div'); ic.className = 'ic'; ic.textContent = h.icon;
+    const mid = document.createElement('div');
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = h.name;
+    const sb = document.createElement('div'); sb.className = 'sb';
+    mid.appendChild(nm); mid.appendChild(sb);
+    const rt = document.createElement('div'); rt.className = 'rt';
+    const pr = document.createElement('div'); pr.className = 'pr';
+    const ow = document.createElement('div'); ow.className = 'ow';
+    rt.appendChild(pr); rt.appendChild(ow);
+    btn.appendChild(ic); btn.appendChild(mid); btn.appendChild(rt);
+    btn.addEventListener('click', () => hire(i));
+    teamListEl.appendChild(btn);
+    teamRows.push({ btn, sb, pr, ow });
+  });
+}
+
+function renderTeam() {
+  HIRES.forEach((h, i) => {
+    const row = teamRows[i];
+    const show = hireRevealed(i);
+    row.btn.style.display = show ? '' : 'none';
+    if (!show) return;
+    const k = Math.max(1, buyQty(i));
+    const price = bulkCost(i, k);
+    const can = buyQty(i) > 0 && price <= loc;
+    row.sb.textContent = fmt(h.rate * genMult(i) * globalMult()) + ' /sec each';
+    row.pr.textContent = fmt(price) + (k > 1 ? ' ×' + k : '');
+    row.ow.textContent = counts[i] > 0 ? fmt(counts[i]) + ' hired' : '';
+    row.btn.disabled = !can;
+    row.btn.classList.toggle('can', can);
+  });
+}
+
+function renderUpgrades() {
+  const visible = UPGRADES.filter(upgradeRevealed);
+  upgradesListEl.textContent = '';
+  let any = false;
+  visible.forEach(u => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'row';
+    const can = u.cost <= loc;
+    if (can) { btn.classList.add('can'); any = true; }
+    btn.disabled = !can;
+
+    const ic = document.createElement('div'); ic.className = 'ic'; ic.textContent = '⬆';
+    const mid = document.createElement('div');
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = u.name;
+    const sb = document.createElement('div'); sb.className = 'sb'; sb.textContent = u.desc;
+    mid.appendChild(nm); mid.appendChild(sb);
+    const rt = document.createElement('div'); rt.className = 'rt';
+    const pr = document.createElement('div'); pr.className = 'pr'; pr.textContent = fmt(u.cost);
+    rt.appendChild(pr);
+
+    btn.appendChild(ic); btn.appendChild(mid); btn.appendChild(rt);
+    btn.addEventListener('click', () => buyUpgrade(u.id));
+    upgradesListEl.appendChild(btn);
+  });
+  if (visible.length === 0) {
+    const p = document.createElement('div');
+    p.id = 'shippedNote';
+    p.textContent = 'No upgrades in reach yet. Keep writing.';
+    upgradesListEl.appendChild(p);
+  }
+  upgDotEl.classList.toggle('on', any && activeTab !== 'upgrades');
+}
+
+function renderShipped() {
+  shippedListEl.textContent = '';
+  const note = document.createElement('div');
+  note.id = 'shippedNote';
+  note.textContent = 'Milestones are real projects from this portfolio. Ship one and it stays shipped through a refactor — tap to go and play it.';
+  shippedListEl.appendChild(note);
+
+  PROJECTS.forEach((p, i) => {
+    const done = i < shipped;
+    const el = document.createElement(done ? 'a' : 'div');
+    el.className = 'ship ' + (done ? 'done' : 'locked');
+    if (done) {
+      el.href = p.href;
+      el.target = '_top';        // escape the arcade iframe
+      el.rel = 'noopener';
+    }
+    const ic = document.createElement('div'); ic.className = 'ic'; ic.textContent = done ? p.icon : '\u{1F512}';
+    const mid = document.createElement('div');
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = done ? p.name : '???';
+    const sb = document.createElement('div'); sb.className = 'sb';
+    sb.textContent = done ? `+${Math.round(p.bonus * 100)}% output` : `at ${fmt(p.at)} lifetime LOC`;
+    mid.appendChild(nm); mid.appendChild(sb);
+    const rt = document.createElement('div'); rt.className = 'rt';
+    const tag = document.createElement('div');
+    tag.className = done ? 'go' : 'req';
+    tag.textContent = done ? 'OPEN ↗' : fmt(Math.max(0, p.at - allTimeLoc)) + ' to go';
+    rt.appendChild(tag);
+    el.appendChild(ic); el.appendChild(mid); el.appendChild(rt);
+    shippedListEl.appendChild(el);
+  });
+}
+
+function renderHud() {
+  locEl.textContent = '';
+  locEl.appendChild(document.createTextNode(fmt(loc)));
+  const small = document.createElement('small');
+  small.textContent = 'LOC';
+  locEl.appendChild(small);
+  rateEl.textContent = `${fmt(locPerSec())} / sec · +${fmt(perClick())} per commit`;
+  clickGainEl.textContent = '+' + fmt(perClick());
+
+  const gain = pendingCraft();
+  craftOwnedEl.textContent = fmt(craft);
+  craftBonusEl.textContent = Math.round(CRAFT_BONUS * 100 * craft) + '%';
+  craftGainEl.textContent = '+' + fmt(gain) + ' next';
+  refactorBtn.disabled = gain < 1;
+  refactorBtn.textContent = gain >= 1 ? `Refactor (+${fmt(gain)})` : 'Refactor';
+}
+
+function renderAll() {
+  renderHud();
+  renderTeam();
+  if (activeTab === 'upgrades') renderUpgrades();
+  else {
+    // Still needed for the notification dot.
+    const any = UPGRADES.some(u => upgradeRevealed(u) && u.cost <= loc);
+    upgDotEl.classList.toggle('on', any);
+  }
+  if (activeTab === 'shipped') renderShipped();
+}
+
+// ── Tabs ──
+const LISTS = { team: teamListEl, upgrades: upgradesListEl, shipped: shippedListEl };
+tabsEl.addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  activeTab = btn.dataset.tab;
+  tabsEl.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+  Object.keys(LISTS).forEach(k => LISTS[k].classList.toggle('hidden', k !== activeTab));
+  buyModesEl.style.display = activeTab === 'team' ? '' : 'none';
+  if (activeTab === 'upgrades') upgDotEl.classList.remove('on');
+  if (activeTab === 'shipped') shipDotEl.classList.remove('on');
+  renderAll();
+});
+
+buyModesEl.addEventListener('click', e => {
+  const btn = e.target.closest('.mode');
+  if (!btn) return;
+  buyMode = btn.dataset.buy === 'max' ? 'max' : Number(btn.dataset.buy);
+  buyModesEl.querySelectorAll('.mode').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+  renderTeam();
+});
+
+refactorBtn.addEventListener('click', refactor);
+
+// ── Clicking ──
+writeBtn.addEventListener('click', e => {
+  const gain = perClick();
+  addLoc(gain);
+  pushLine('code');
+  const r = writeBtn.getBoundingClientRect();
+  spawnPop(e.clientX || r.left + r.width / 2, e.clientY || r.top, '+' + fmt(gain));
+  checkShipped();
+  renderAll();
+});
+
+function spawnPop(x, y, text) {
+  const el = document.createElement('div');
+  el.className = 'pop';
+  el.textContent = text;
+  el.style.left = x + 'px';
+  el.style.top = (y - 14) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+// ── Modal ──
+function showCard(lead, accent, sub, amount, note) {
+  cardTitleEl.textContent = lead + ' ';
+  const s = document.createElement('span');
+  s.textContent = accent;
+  cardTitleEl.appendChild(s);
+  cardSubEl.textContent = sub;
+  cardAmountEl.textContent = amount;
+  cardNoteEl.textContent = note;
+  modalEl.classList.remove('hidden');
+}
+cardBtn.addEventListener('click', () => modalEl.classList.add('hidden'));
+
+// ── Save / load ──
+function save() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: SAVE_VERSION, loc, runLoc, allTimeLoc, peakLoc,
+      counts, owned, shipped, craft, refactors, lastSeen: Date.now(),
+    }));
+  } catch (e) { /* storage blocked — the run simply will not persist */ }
+}
+
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
+  if (!raw) return null;
+  let d;
+  try { d = JSON.parse(raw); } catch (e) { return null; }
+  if (!d || d.v !== SAVE_VERSION) return null;
+
+  const num = (v, fb) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : fb);
+  loc = num(d.loc, 0);
+  runLoc = num(d.runLoc, 0);
+  allTimeLoc = num(d.allTimeLoc, 0);
+  peakLoc = num(d.peakLoc, loc);
+  craft = num(d.craft, 0);
+  refactors = num(d.refactors, 0);
+  deriveShipped();                      // recomputed, not read from the save
+  counts = HIRES.map((_, i) => {
+    const c = Array.isArray(d.counts) ? d.counts[i] : 0;
+    return typeof c === 'number' && isFinite(c) && c >= 0 ? Math.floor(c) : 0;
+  });
+  owned = {};
+  if (d.owned && typeof d.owned === 'object') {
+    UPGRADES.forEach(u => { if (d.owned[u.id]) owned[u.id] = true; });
+  }
+  return num(d.lastSeen, Date.now());
+}
+
+// Offline output is uncapped on purpose — walking away is a legitimate way to
+// play. The only guard is a clock that ran backwards, which would otherwise
+// hand out a negative amount.
+function applyOffline(savedAt) {
+  if (!savedAt) return null;
+  const elapsed = (Date.now() - savedAt) / 1000;
+  if (!isFinite(elapsed) || elapsed <= 0) return null;
+  const earned = locPerSec() * elapsed;
+  if (earned <= 0) return null;
+  addLoc(earned);
+  return { elapsed, earned };
+}
+
+// ── Loop ──
+let last = performance.now();
+let sinceSave = 0;
+let sinceUi = 0;
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.25);
+  last = now;
+
+  const gained = locPerSec() * dt;
+  if (gained > 0) addLoc(gained);
+  tickLines(dt);
+  checkShipped();
+
+  // A few dozen DOM writes at 60fps is churn for digits nobody reads that fast.
+  sinceUi += dt;
+  if (sinceUi > 0.1) { sinceUi = 0; renderAll(); }
+
+  sinceSave += dt;
+  if (sinceSave > 5) { sinceSave = 0; save(); }
+}
+
+// ── Init ──
+const savedAt = load();
+buildTeam();
+for (let i = 0; i < 8; i++) pushLine('code');
+renderAll();
+renderShipped();
+
+const off = applyOffline(savedAt);
+if (off && off.elapsed > 30) {
+  showCard('Welcome', 'back', 'You were away for ' + fmtDuration(off.elapsed),
+    '+' + fmt(off.earned) + ' LOC',
+    'The build kept running the whole time — no cap, no catch.');
+}
+checkShipped();
+
+window.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+window.addEventListener('pagehide', save);
+window.addEventListener('beforeunload', save);
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
