@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+<title>Falling Sand</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { overscroll-behavior: none; }
+  body {
+    background: #07060f;
+    overflow: hidden;
+    height: 100vh; height: 100dvh;
+    width: 100vw;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    color: #fff;
+  }
+  /* Column layout: the canvas gets its own bounded area with the controls
+     below it. Everything falls to the bottom of the grid, so a control bar
+     floating over the canvas would sit exactly on top of the results. */
+  #gameContainer {
+    display: flex; flex-direction: column;
+    width: 100vw; height: 100vh; height: 100dvh; overflow: hidden;
+  }
+  #simWrap {
+    position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
+    /* iOS ignores user-scalable=no, so kill pan and double-tap zoom here. */
+    touch-action: none;
+  }
+  /* The canvas is the simulation grid itself, scaled up by CSS. */
+  #sim {
+    display: block; width: 100%; height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    touch-action: none;
+  }
+
+  /* ── Top bar ── */
+  #topBar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 14px 18px; gap: 12px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 100%);
+    pointer-events: none; z-index: 10;
+  }
+  #topBar > * { pointer-events: auto; }
+  #backLink {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: rgba(255,255,255,0.75); text-decoration: none;
+    font-size: 14px; font-weight: 600;
+    padding: 7px 13px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.07);
+    transition: color 0.2s, background 0.2s;
+  }
+  #backLink:hover { color: #fff; background: rgba(255,255,255,0.16); }
+  #stats {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.6px;
+    color: rgba(255,255,255,0.5); text-align: right; line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  }
+
+  /* ── Bottom controls ── */
+  #controls {
+    flex: 0 0 auto;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: #0d0b1c;
+    border-top: 1px solid rgba(255,255,255,0.09);
+    display: flex; flex-direction: column; gap: 9px; align-items: center;
+  }
+  #palette {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 7px;
+    max-width: 760px;
+  }
+  .mat {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 13px; border-radius: 999px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    color: rgba(255,255,255,0.72);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .mat:hover { background: rgba(255,255,255,0.13); color: #fff; }
+  .mat[aria-pressed="true"] {
+    background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.7); color: #fff;
+  }
+  .swatch {
+    width: 14px; height: 14px; border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.45);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+    flex: none;
+  }
+  #tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .tool-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.6px;
+    color: rgba(255,255,255,0.5); text-transform: uppercase;
+  }
+  #brush {
+    -webkit-appearance: none; appearance: none;
+    width: 132px; height: 22px; background: transparent; cursor: pointer;
+  }
+  #brush::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px; background: rgba(255,255,255,0.22);
+  }
+  #brush::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 18px; height: 18px; border-radius: 50%; margin-top: -7px;
+    background: #fff; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+  #brush::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.22); }
+  #brush::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 999px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16);
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+
+  /* ── First-run hint ── */
+  #hint {
+    position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
+    z-index: 9; text-align: center; pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  #hint h1 {
+    font-size: 40px; font-weight: 800; letter-spacing: -1px; margin-bottom: 10px;
+    text-shadow: 0 3px 20px rgba(0,0,0,0.7);
+  }
+  #hint h1 span {
+    background: linear-gradient(135deg, #ffcc66 0%, #ff7a45 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  #hint p { font-size: 15px; color: rgba(255,255,255,0.62); text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+  #hint.gone { opacity: 0; }
+
+  @media (max-width: 560px) {
+    #topBar { padding: 10px 12px; }
+    #hint h1 { font-size: 30px; }
+    #hint p { font-size: 13px; padding: 0 24px; }
+    .mat { padding: 7px 11px; font-size: 12px; gap: 6px; }
+    #palette { gap: 6px; }
+    #brush { width: 108px; }
+  }
+  /* Short screens (landscape phones) have very little height to spare, so drop
+     the palette to colour swatches only — names would push it to three rows and
+     leave barely half the screen to draw on. */
+  @media (max-height: 460px) {
+    #hint { top: 32%; }
+    #hint h1 { font-size: 26px; margin-bottom: 6px; }
+    #hint p { font-size: 12px; }
+    #controls { padding-top: 6px; gap: 6px; }
+    .mat-name { display: none; }
+    .mat { padding: 8px; gap: 0; }
+    .swatch { width: 18px; height: 18px; }
+    #tools { gap: 12px; }
+    #brush { width: 100px; }
+  }
+
+  /* Touch devices: 44px tap targets. Last in the sheet so the size-based
+     queries above cannot shrink them back below the minimum. */
+  @media (pointer: coarse) {
+    #backLink { min-height: 44px; padding: 10px 18px; font-size: 15px; }
+    .mat { min-height: 44px; padding: 10px 15px; font-size: 13px; }
+    .btn { min-height: 44px; padding: 10px 18px; font-size: 14px; }
+    #brush { height: 44px; }
+    #brush::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -10px; }
+    #brush::-moz-range-thumb { width: 24px; height: 24px; }
+  }
+  /* Keep the full 44px height on a narrow phone but tighten the buttons
+     horizontally, or ten materials push the palette to four rows and swallow
+     a third of the canvas. */
+  @media (pointer: coarse) and (max-width: 560px) {
+    .mat { padding: 8px 10px; font-size: 11px; gap: 5px; }
+    .swatch { width: 11px; height: 11px; }
+    #palette { gap: 5px; }
+    #tools { gap: 10px; }
+  }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <div id="simWrap">
+    <canvas id="sim"></canvas>
+
+    <div id="topBar">
+      <a id="backLink" href="/#/games" target="_top">&#8592; Arcade</a>
+      <div id="stats">
+        <div id="fpsLine">60 FPS</div>
+        <div id="cellLine">0 particles</div>
+        <div id="rowLine">0 rows active</div>
+      </div>
+    </div>
+
+    <div id="hint">
+      <h1>Falling <span>Sand</span></h1>
+      <p id="hintText">Pick a material and drag to draw. Water puts out fire, fire burns oil, acid eats stone, plants drink water.</p>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div id="palette"></div>
+    <div id="tools">
+      <label class="tool-label" for="brush">Brush
+        <input id="brush" type="range" min="1" max="16" value="5" aria-label="Brush size">
+      </label>
+      <button class="btn" id="clearBtn" type="button">Clear</button>
+      <button class="btn" id="pauseBtn" type="button" aria-pressed="false">Pause</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── DOM ──
+const simWrap = document.getElementById('simWrap');
+const canvas = document.getElementById('sim');
+const ctx = canvas.getContext('2d', { alpha: false });
+const paletteEl = document.getElementById('palette');
+const brushEl = document.getElementById('brush');
+const clearBtn = document.getElementById('clearBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const fpsLineEl = document.getElementById('fpsLine');
+const cellLineEl = document.getElementById('cellLine');
+const rowLineEl = document.getElementById('rowLine');
+const hintEl = document.getElementById('hint');
+const hintTextEl = document.getElementById('hintText');
+
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+// ── Materials ──
+// Movement falls out of `kind` plus `density`: a cell may move into a target
+// that is empty or lighter than itself, swapping the two. That single rule
+// gives sand sinking through water and oil floating on water for free.
+const EMPTY = 0, SAND = 1, WATER = 2, OIL = 3, STONE = 4,
+      WOOD = 5, FIRE = 6, PLANT = 7, ACID = 8, STEAM = 9;
+
+const POWDER = 'powder', LIQUID = 'liquid', GAS = 'gas', STATIC = 'static';
+
+const MATERIALS = [
+  { id: EMPTY, name: 'Eraser', kind: STATIC, density: 0,    rgb: [10, 9, 20],     flammable: false },
+  { id: SAND,  name: 'Sand',   kind: POWDER, density: 8,    rgb: [224, 190, 110], flammable: false },
+  { id: WATER, name: 'Water',  kind: LIQUID, density: 5,    rgb: [58, 126, 216],  flammable: false },
+  { id: OIL,   name: 'Oil',    kind: LIQUID, density: 4,    rgb: [92, 74, 58],    flammable: true  },
+  { id: STONE, name: 'Stone',  kind: STATIC, density: 100,  rgb: [122, 122, 138], flammable: false },
+  { id: WOOD,  name: 'Wood',   kind: STATIC, density: 100,  rgb: [124, 84, 48],   flammable: true  },
+  { id: FIRE,  name: 'Fire',   kind: GAS,    density: 1,    rgb: [255, 136, 40],  flammable: false },
+  { id: PLANT, name: 'Plant',  kind: STATIC, density: 100,  rgb: [70, 168, 78],   flammable: true  },
+  { id: ACID,  name: 'Acid',   kind: LIQUID, density: 5,    rgb: [150, 224, 60],  flammable: false },
+  { id: STEAM, name: 'Steam',  kind: GAS,    density: 1,    rgb: [176, 190, 205], flammable: false },
+];
+
+// Flat lookup tables — hot loop reads these, never the objects above.
+const DENSITY = new Uint8Array(MATERIALS.length);
+const FLAMMABLE = new Uint8Array(MATERIALS.length);
+// Materials that do something over time regardless of whether they move.
+const REACTIVE = new Uint8Array(MATERIALS.length);
+const COLORS = new Uint8Array(MATERIALS.length * 3); // flat, for the pixel loop
+const KIND = [];
+MATERIALS.forEach(m => {
+  DENSITY[m.id] = m.density;
+  FLAMMABLE[m.id] = m.flammable ? 1 : 0;
+  KIND[m.id] = m.kind;
+  COLORS[m.id * 3] = m.rgb[0];
+  COLORS[m.id * 3 + 1] = m.rgb[1];
+  COLORS[m.id * 3 + 2] = m.rgb[2];
+});
+[FIRE, STEAM, ACID, PLANT].forEach(id => { REACTIVE[id] = 1; });
+
+const FIRE_LIFE = 140;   // ticks a flame burns before dying
+const STEAM_LIFE = 220;  // ticks before steam condenses back to water
+// Cells move one square per tick, so on a tall phone grid a single tick per
+// frame makes everything drift down at a sluggish ~180px/s. Two ticks per frame
+// gives the fall some weight; there is ample headroom for it.
+const TICKS_PER_FRAME = 2;
+
+// ── Grid ──
+// Cell size is picked so the total stays fine-grained but bounded: the whole
+// grid is walked every frame, so the cell count is the simulation's cost.
+const TARGET_CELLS = 70000;
+const MAX_CELLS = 70000;
+const MIN_CELL_PX = 3;
+const MAX_CELL_PX = 6;
+
+let cols = 0, rows = 0, cellPx = 4;
+let cells, life, shade, moved;
+// Row-level sleeping: a row is only simulated if something changed in or next
+// to it last frame. Settled scenes then cost almost nothing, which is what
+// keeps a screen full of sand cheap on a phone.
+let rowAwake, rowNext;
+let imageData, pixels;
+
+function computeCellSize(w, h) {
+  let px = Math.max(MIN_CELL_PX, Math.min(MAX_CELL_PX, Math.round(Math.sqrt((w * h) / TARGET_CELLS))));
+  // Rounding to whole pixels can overshoot the budget, so enforce the cap.
+  while (px < MAX_CELL_PX && Math.floor(w / px) * Math.floor(h / px) > MAX_CELLS) px++;
+  return px;
+}
+
+function resize() {
+  const w = Math.max(1, simWrap.clientWidth);
+  const h = Math.max(1, simWrap.clientHeight);
+  cellPx = computeCellSize(w, h);
+  const newCols = Math.max(24, Math.floor(w / cellPx));
+  const newRows = Math.max(24, Math.floor(h / cellPx));
+  if (newCols === cols && newRows === rows) return;
+
+  const old = cells, oldCols = cols, oldRows = rows;
+  cols = newCols;
+  rows = newRows;
+
+  cells = new Uint8Array(cols * rows);
+  life = new Uint8Array(cols * rows);
+  shade = new Uint8Array(cols * rows);
+  moved = new Uint8Array(cols * rows);
+  rowAwake = new Uint8Array(rows).fill(1);
+  rowNext = new Uint8Array(rows);
+
+  // Carry the existing scene across a resize instead of wiping it.
+  if (old) {
+    const c = Math.min(oldCols, cols), r = Math.min(oldRows, rows);
+    for (let y = 0; y < r; y++) {
+      for (let x = 0; x < c; x++) cells[y * cols + x] = old[y * oldCols + x];
+    }
+  }
+  for (let i = 0; i < shade.length; i++) shade[i] = (Math.random() * 256) | 0;
+
+  canvas.width = cols;
+  canvas.height = rows;
+  imageData = ctx.createImageData(cols, rows);
+  pixels = imageData.data;
+  for (let i = 3; i < pixels.length; i += 4) pixels[i] = 255; // opaque
+}
+
+// ── Simulation ──
+let frame = 0;
+let paused = false;
+let awakeRows = 0;
+
+const idx = (x, y) => y * cols + x;
+const inBounds = (x, y) => x >= 0 && x < cols && y >= 0 && y < rows;
+
+// Any change wakes its row and the rows either side, so movement can propagate
+// into a sleeping region instead of stalling at its edge.
+//
+// Both the current and next frame's sets are marked. Marking only the next set
+// would lose wakes that happen between frames — painting, or a scripted edit —
+// because those land while the current set is already stale, and a cell whose
+// row never wakes is never simulated again, so it can never wake itself.
+function wake(y) {
+  const lo = y > 0 ? y - 1 : 0;
+  const hi = y < rows - 1 ? y + 1 : rows - 1;
+  for (let r = lo; r <= hi; r++) {
+    rowAwake[r] = 1;
+    rowNext[r] = 1;
+  }
+}
+
+function wakeIdx(i) { wake((i / cols) | 0); }
+
+function swap(a, b) {
+  const cm = cells[a], lm = life[a], sm = shade[a];
+  cells[a] = cells[b]; life[a] = life[b]; shade[a] = shade[b];
+  cells[b] = cm; life[b] = lm; shade[b] = sm;
+  moved[b] = 1;
+  wakeIdx(a);
+  wakeIdx(b);
+}
+
+function setCell(i, mat) {
+  cells[i] = mat;
+  life[i] = mat === FIRE ? FIRE_LIFE : mat === STEAM ? STEAM_LIFE : 0;
+  shade[i] = (Math.random() * 256) | 0;
+  wakeIdx(i);
+}
+
+function clearCell(i) {
+  cells[i] = EMPTY;
+  life[i] = 0;
+  wakeIdx(i);
+}
+
+// True if `from` may move into `to`. Empty always yields; static never does.
+// Otherwise density decides, and the test flips with direction: something
+// sinking displaces what is lighter, something rising displaces what is
+// heavier — which is what lets steam bubble up through a pool of water.
+function canMoveInto(from, to, rising) {
+  const t = cells[to];
+  if (t === EMPTY) return true;
+  if (KIND[t] === STATIC) return false;
+  return rising ? DENSITY[t] > DENSITY[cells[from]]
+                : DENSITY[t] < DENSITY[cells[from]];
+}
+
+function tryMove(from, x, y, rising) {
+  if (!inBounds(x, y)) return false;
+  const to = idx(x, y);
+  if (moved[to]) return false;
+  if (!canMoveInto(from, to, rising)) return false;
+  swap(from, to);
+  return true;
+}
+
+function updatePowder(i, x, y) {
+  if (tryMove(i, x, y + 1, false)) return;
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  if (tryMove(i, x + dir, y + 1, false)) return;
+  tryMove(i, x - dir, y + 1, false);
+}
+
+function updateLiquid(i, x, y) {
+  if (tryMove(i, x, y + 1, false)) return;
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  if (tryMove(i, x + dir, y + 1, false)) return;
+  if (tryMove(i, x - dir, y + 1, false)) return;
+  // Spread sideways so pools find their level.
+  if (tryMove(i, x + dir, y, false)) return;
+  tryMove(i, x - dir, y, false);
+}
+
+function updateGas(i, x, y) {
+  if (tryMove(i, x, y - 1, true)) return;
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  if (tryMove(i, x + dir, y - 1, true)) return;
+  if (tryMove(i, x - dir, y - 1, true)) return;
+  tryMove(i, x + dir, y, true);
+}
+
+// Four-neighbour offsets, reused by the reaction helpers.
+const NX = [1, -1, 0, 0];
+const NY = [0, 0, 1, -1];
+
+function hasFuelAround(x, y) {
+  for (let n = 0; n < 4; n++) {
+    const nx = x + NX[n], ny = y + NY[n];
+    if (!inBounds(nx, ny)) continue;
+    if (FLAMMABLE[cells[idx(nx, ny)]]) return true;
+  }
+  return false;
+}
+
+function reactFire(i, x, y) {
+  wake(y); // burns down over time, so it must keep its row alive
+  let doused = false;
+  for (let n = 0; n < 4; n++) {
+    const nx = x + NX[n], ny = y + NY[n];
+    if (!inBounds(nx, ny)) continue;
+    const j = idx(nx, ny);
+    const t = cells[j];
+    if (t === WATER) {
+      doused = true;
+      if (Math.random() < 0.4) setCell(j, STEAM);
+    } else if (FLAMMABLE[t] && Math.random() < 0.12) {
+      setCell(j, FIRE);
+    }
+  }
+  if (doused) { setCell(i, STEAM); return; }
+  if (life[i] <= 1) {
+    // Burnt out: usually vanishes, sometimes leaves a puff of smoke.
+    if (Math.random() < 0.25) setCell(i, STEAM); else clearCell(i);
+    return;
+  }
+  life[i]--;
+}
+
+function reactSteam(i, x, y) {
+  wake(y); // condenses on a timer
+  if (life[i] <= 1) { setCell(i, WATER); return; }
+  life[i]--;
+}
+
+function reactPlant(i, x, y) {
+  // Creeps into adjacent water, and self-limits by drinking the pool dry.
+  wake(y); // growth is random over time, so never let the row settle
+  if (Math.random() > 0.06) return;
+  const n = (Math.random() * 4) | 0;
+  const nx = x + NX[n], ny = y + NY[n];
+  if (!inBounds(nx, ny)) return;
+  const j = idx(nx, ny);
+  if (cells[j] === WATER) setCell(j, PLANT);
+}
+
+function reactAcid(i, x, y) {
+  let touching = false;
+  for (let n = 0; n < 4; n++) {
+    const nx = x + NX[n], ny = y + NY[n];
+    if (!inBounds(nx, ny)) continue;
+    const j = idx(nx, ny);
+    const t = cells[j];
+    if (t === EMPTY || t === ACID || t === STEAM || t === FIRE) continue;
+    touching = true;
+    if (Math.random() < 0.14) {
+      clearCell(j);
+      // Acid is spent doing it, so a puddle eventually runs out.
+      if (Math.random() < 0.45) { clearCell(i); return; }
+    }
+  }
+  // Acid resting against something is still eating it, on a timer.
+  if (touching) wake(y);
+}
+
+function step() {
+  moved.fill(0);
+  frame++;
+  const leftToRight = (frame & 1) === 0;
+  awakeRows = 0;
+
+  // ── Pass 1: reactions ──
+  // Nothing moves here, so every reactive cell is visited exactly once. Folding
+  // this into the movement pass starves any cell that gets swapped *backwards*
+  // past the scan cursor: a flame in an oil pool is shoved aside by the oil
+  // scanned just before it, lands where the cursor has already been, and is
+  // skipped — every frame, forever. It never burnt down and never ignited
+  // anything, because its update simply never ran.
+  for (let y = rows - 1; y >= 0; y--) {
+    if (!rowAwake[y]) continue;
+    for (let x = 0; x < cols; x++) {
+      const i = idx(x, y);
+      const m = cells[i];
+      if (!REACTIVE[m]) continue;
+      if (m === FIRE) reactFire(i, x, y);
+      else if (m === STEAM) reactSteam(i, x, y);
+      else if (m === ACID) reactAcid(i, x, y);
+      else reactPlant(i, x, y);
+    }
+  }
+
+  // ── Pass 2: movement ──
+  // Bottom-up so a falling cell cannot travel several rows in one frame.
+  for (let y = rows - 1; y >= 0; y--) {
+    if (!rowAwake[y]) continue; // nothing changed here or beside it last frame
+    awakeRows++;
+    for (let n = 0; n < cols; n++) {
+      // Alternate scan direction each frame, or piles visibly lean one way.
+      const x = leftToRight ? n : cols - 1 - n;
+      const i = idx(x, y);
+      const m = cells[i];
+      if (m === EMPTY || moved[i]) continue;
+
+      const kind = KIND[m];
+      if (kind === STATIC) continue;
+      // A flame clings to whatever it is burning and only drifts upward once
+      // the fuel beside it is gone, or it floats off before anything catches.
+      if (m === FIRE && hasFuelAround(x, y)) continue;
+
+      if (kind === POWDER) updatePowder(i, x, y);
+      else if (kind === LIQUID) updateLiquid(i, x, y);
+      else updateGas(i, x, y);
+    }
+  }
+
+  // Roll the wake set forward: what changed this frame is what runs next.
+  const tmp = rowAwake;
+  rowAwake = rowNext;
+  rowNext = tmp;
+  rowNext.fill(0);
+}
+
+function countParticles() {
+  let c = 0;
+  for (let i = 0; i < cells.length; i++) if (cells[i] !== EMPTY) c++;
+  return c;
+}
+
+// ── Render ──
+function render() {
+  const data = pixels;
+  for (let i = 0, p = 0; i < cells.length; i++, p += 4) {
+    const m = cells[i];
+    const c = m * 3;
+    let r = COLORS[c], g = COLORS[c + 1], b = COLORS[c + 2];
+
+    if (m === FIRE) {
+      // Flames cool from white-hot to deep red as they burn down.
+      const t = life[i] / FIRE_LIFE;
+      r = 255;
+      g = 60 + (200 * t) | 0;
+      b = (60 * t * t) | 0;
+    } else if (m !== EMPTY) {
+      // Small per-cell tint so large bodies do not look like flat paint.
+      const v = (shade[i] - 128) * 0.09;
+      r += v; g += v; b += v;
+    }
+
+    data[p] = r < 0 ? 0 : r > 255 ? 255 : r;
+    data[p + 1] = g < 0 ? 0 : g > 255 ? 255 : g;
+    data[p + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// ── Drawing ──
+let selected = SAND;
+let drawing = false;
+let lastX = null, lastY = null;
+
+function pointToCell(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: Math.floor(((clientX - r.left) / r.width) * cols),
+    y: Math.floor(((clientY - r.top) / r.height) * rows),
+  };
+}
+
+function paintAt(cx, cy) {
+  const radius = parseInt(brushEl.value, 10);
+  const r2 = radius * radius;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx * dx + dy * dy > r2) continue;
+      const x = cx + dx, y = cy + dy;
+      if (!inBounds(x, y)) continue;
+      const i = idx(x, y);
+      if (selected === EMPTY) { clearCell(i); continue; }
+      // Loose materials get sprayed rather than poured, so a stroke looks
+      // granular instead of like a solid stamp.
+      const loose = KIND[selected] !== STATIC;
+      if (loose && Math.random() < 0.25) continue;
+      if (cells[i] !== EMPTY && KIND[cells[i]] === STATIC && selected !== EMPTY) continue;
+      setCell(i, selected);
+    }
+  }
+}
+
+// Fill in the gaps a fast drag would otherwise leave between frames.
+function paintLine(x0, y0, x1, y1) {
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const steps = Math.max(dx, dy);
+  if (steps === 0) { paintAt(x1, y1); return; }
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    paintAt(Math.round(x0 + (x1 - x0) * t), Math.round(y0 + (y1 - y0) * t));
+  }
+}
+
+function beginDraw(e) {
+  if (e.target.closest('button, a, input, label')) return; // let the UI work
+  if (!e.isPrimary) return;                                // one finger paints
+  e.preventDefault();
+  drawing = true;
+  hintEl.classList.add('gone');
+  const p = pointToCell(e.clientX, e.clientY);
+  lastX = p.x; lastY = p.y;
+  paintAt(p.x, p.y);
+  if (canvas.setPointerCapture) {
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  }
+}
+
+function moveDraw(e) {
+  if (!drawing || !e.isPrimary) return;
+  e.preventDefault();
+  const p = pointToCell(e.clientX, e.clientY);
+  paintLine(lastX, lastY, p.x, p.y);
+  lastX = p.x; lastY = p.y;
+}
+
+function endDraw() { drawing = false; lastX = lastY = null; }
+
+// Listeners live on the canvas wrapper, so the control bar below it can never
+// be mistaken for a drawing surface.
+simWrap.addEventListener('pointerdown', beginDraw, { passive: false });
+simWrap.addEventListener('pointermove', moveDraw, { passive: false });
+window.addEventListener('pointerup', endDraw);
+window.addEventListener('pointercancel', endDraw);
+
+// ── Palette ──
+function buildPalette() {
+  MATERIALS.forEach(m => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mat';
+    btn.dataset.mat = String(m.id);
+    btn.setAttribute('aria-pressed', String(m.id === selected));
+
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = m.id === EMPTY
+      ? 'repeating-linear-gradient(45deg,#333 0 3px,#555 3px 6px)'
+      : `rgb(${m.rgb[0]}, ${m.rgb[1]}, ${m.rgb[2]})`;
+
+    const label = document.createElement('span');
+    label.className = 'mat-name';
+    label.textContent = m.name;
+    // The name is hidden on short screens, so keep it available to the
+    // accessibility tree and as a tooltip.
+    btn.title = m.name;
+    btn.setAttribute('aria-label', m.name);
+
+    btn.appendChild(sw);
+    btn.appendChild(label);
+    btn.addEventListener('click', () => selectMaterial(m.id));
+    paletteEl.appendChild(btn);
+  });
+}
+
+function selectMaterial(id) {
+  selected = id;
+  paletteEl.querySelectorAll('.mat').forEach(b => {
+    b.setAttribute('aria-pressed', String(Number(b.dataset.mat) === id));
+  });
+}
+
+clearBtn.addEventListener('click', () => {
+  cells.fill(EMPTY);
+  life.fill(0);
+  rowNext.fill(1);
+});
+
+pauseBtn.addEventListener('click', () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  pauseBtn.setAttribute('aria-pressed', String(paused));
+});
+
+// Number keys pick a material; space pauses.
+window.addEventListener('keydown', e => {
+  if (e.key >= '1' && e.key <= '9') {
+    selectMaterial(Number(e.key));
+  } else if (e.key === '0') {
+    selectMaterial(EMPTY);
+  } else if (e.code === 'Space') {
+    e.preventDefault();
+    pauseBtn.click();
+  }
+});
+
+// ── Opening scene, so the canvas is never blank on arrival ──
+function seedScene() {
+  const floor = Math.floor(rows * 0.82);
+  for (let x = 0; x < cols; x++) {
+    for (let y = floor; y < rows; y++) setCell(idx(x, y), STONE);
+  }
+  // A basin of water in the middle of the floor.
+  const bx0 = Math.floor(cols * 0.3), bx1 = Math.floor(cols * 0.7);
+  for (let x = bx0; x < bx1; x++) {
+    for (let y = floor - Math.floor(rows * 0.06); y < floor; y++) clearCell(idx(x, y));
+  }
+  for (let x = bx0 + 1; x < bx1 - 1; x++) {
+    for (let y = floor - Math.floor(rows * 0.05); y < floor; y++) setCell(idx(x, y), WATER);
+  }
+  // A mound of sand waiting to slump.
+  const mx = Math.floor(cols * 0.16), mr = Math.floor(Math.min(cols, rows) * 0.09);
+  for (let dy = -mr; dy <= 0; dy++) {
+    for (let dx = -mr; dx <= mr; dx++) {
+      if (dx * dx + dy * dy > mr * mr) continue;
+      const x = mx + dx, y = floor - 1 + dy;
+      if (inBounds(x, y)) setCell(idx(x, y), SAND);
+    }
+  }
+}
+
+// ── Main loop ──
+let lastFpsUpdate = 0, framesSince = 0, fps = 60;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (!paused) { for (let t = 0; t < TICKS_PER_FRAME; t++) step(); }
+  render();
+
+  framesSince++;
+  if (now - lastFpsUpdate >= 500) {
+    fps = Math.round((framesSince * 1000) / (now - lastFpsUpdate));
+    lastFpsUpdate = now;
+    framesSince = 0;
+    fpsLineEl.textContent = fps + ' FPS';
+    cellLineEl.textContent = countParticles().toLocaleString() + ' particles';
+    rowLineEl.textContent = awakeRows + ' / ' + rows + ' rows active';
+  }
+}
+
+window.addEventListener('resize', () => {
+  resize();
+  render();
+});
+
+// ── Init ──
+resize();
+buildPalette();
+seedScene();
+if (isTouch) {
+  hintTextEl.textContent = 'Pick a material and drag to draw. Water puts out fire, fire burns oil, acid eats stone, plants drink water.';
+}
+render();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
