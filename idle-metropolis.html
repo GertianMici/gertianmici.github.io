@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;" />
+<title>Idle Metropolis</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { overscroll-behavior: none; }
+  body {
+    background: #05060f;
+    overflow: hidden;
+    height: 100vh; height: 100dvh;
+    width: 100vw;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    color: #fff;
+  }
+  #game { display: flex; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
+
+  /* ── City view ── */
+  #cityWrap { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; touch-action: none; }
+  #city { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 14px 18px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+    pointer-events: none;
+  }
+  #hud > * { pointer-events: auto; }
+  #backLink {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: rgba(255,255,255,0.75); text-decoration: none;
+    font-size: 14px; font-weight: 600;
+    padding: 7px 13px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.35);
+    transition: color 0.2s, background 0.2s;
+  }
+  #backLink:hover { color: #fff; background: rgba(255,255,255,0.18); }
+  #wallet { text-align: right; line-height: 1.15; text-shadow: 0 2px 10px rgba(0,0,0,0.85); }
+  #money { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+  #rate {
+    font-size: 13px; font-weight: 600; color: #7ee0a8;
+    font-variant-numeric: tabular-nums; margin-top: 1px;
+  }
+  #clock {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    color: rgba(255,255,255,0.42); margin-top: 4px;
+  }
+  #tapHint {
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    z-index: 9; pointer-events: none; text-align: center;
+    font-size: 12px; color: rgba(255,255,255,0.4);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+    transition: opacity 0.4s ease;
+  }
+  #tapHint.gone { opacity: 0; }
+
+  /* Floating "+§" when you tap the city */
+  .pop {
+    position: absolute; z-index: 11; pointer-events: none;
+    font-size: 16px; font-weight: 800; color: #ffe9a3;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.9);
+    animation: popUp 0.9s ease-out forwards;
+  }
+  @keyframes popUp {
+    0% { opacity: 0; transform: translate(-50%, 0) scale(0.8); }
+    18% { opacity: 1; transform: translate(-50%, -8px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -46px) scale(1); }
+  }
+
+  /* ── Shop panel ── */
+  #panel {
+    flex: 0 0 340px; display: flex; flex-direction: column;
+    background: #0b0c1a; border-left: 1px solid rgba(255,255,255,0.09);
+    min-height: 0;
+  }
+  #panelHead {
+    padding: 14px 16px 10px; border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  #panelTitle {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+  }
+  #buyModes { display: flex; gap: 6px; }
+  .mode {
+    flex: 1; padding: 8px 0; border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .mode:hover { background: rgba(255,255,255,0.13); color: #fff; }
+  .mode[aria-pressed="true"] {
+    background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+    border-color: transparent; color: #04121b;
+  }
+
+  #shop { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px; }
+  .item {
+    display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px;
+    width: 100%; text-align: left; cursor: pointer;
+    padding: 10px 11px; margin-bottom: 7px; border-radius: 11px;
+    font-family: inherit; color: #fff;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.09);
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  }
+  .item:hover:not(:disabled) { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.22); }
+  .item:disabled { cursor: not-allowed; opacity: 0.42; }
+  .item.affordable { border-color: rgba(126, 224, 168, 0.5); }
+  .chip {
+    width: 40px; height: 40px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; line-height: 1;
+    background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12);
+  }
+  .item-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
+  .item-sub {
+    font-size: 11.5px; color: rgba(255,255,255,0.5); margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .item-right { text-align: right; }
+  .item-cost {
+    font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; color: #ffe9a3;
+  }
+  .item.affordable .item-cost { color: #7ee0a8; }
+  .item-owned {
+    font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4);
+    font-variant-numeric: tabular-nums; margin-top: 2px;
+  }
+  .locked-note { font-size: 11.5px; color: rgba(255,255,255,0.4); }
+
+  #panelFoot {
+    border-top: 1px solid rgba(255,255,255,0.07); padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #legacyLine {
+    font-size: 12px; color: rgba(255,255,255,0.55); font-variant-numeric: tabular-nums;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  #legacyLine b { color: #c9a6ff; }
+  #prestigeBtn {
+    width: 100%; padding: 12px; border-radius: 10px; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 800; color: #140b22;
+    background: linear-gradient(135deg, #d5b3ff 0%, #8f6fe0 100%);
+    border: none; box-shadow: 0 8px 22px rgba(160, 110, 240, 0.25);
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  }
+  #prestigeBtn:hover:not(:disabled) { transform: translateY(-1px); }
+  #prestigeBtn:disabled {
+    cursor: not-allowed; opacity: 0.4; background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.55); box-shadow: none;
+  }
+
+  /* ── Modal ── */
+  #modal {
+    position: fixed; inset: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    background: rgba(4, 4, 14, 0.76); backdrop-filter: blur(4px);
+    transition: opacity 0.25s ease;
+  }
+  #modal.hidden { display: none; }
+  #modalCard {
+    max-width: 400px; width: 100%; text-align: center;
+    background: #12132a; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 18px; padding: 26px 24px;
+    box-shadow: 0 30px 70px rgba(0,0,0,0.6);
+  }
+  #modalTitle { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+  #modalTitle span {
+    background: linear-gradient(135deg, #00d4ff 0%, #7b5cff 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  #modalAway { font-size: 13px; color: rgba(255,255,255,0.55); margin-bottom: 16px; }
+  #modalAmount {
+    font-size: 34px; font-weight: 800; color: #7ee0a8;
+    font-variant-numeric: tabular-nums; margin-bottom: 6px; line-height: 1.1;
+  }
+  #modalNote { font-size: 12px; color: rgba(255,255,255,0.42); margin-bottom: 20px; }
+  #modalBtn {
+    padding: 13px 40px; border-radius: 999px; cursor: pointer; border: none;
+    font-family: inherit; font-size: 16px; font-weight: 700; color: #04121b;
+    background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+    box-shadow: 0 10px 26px rgba(0, 212, 255, 0.3);
+  }
+
+  /* ── Responsive: stack the panel under the city on narrow screens ── */
+  @media (max-width: 820px) {
+    #game { flex-direction: column; }
+    #cityWrap { flex: 1 1 auto; min-height: 0; }
+    #panel {
+      flex: 0 0 46%; max-height: 46%;
+      border-left: none; border-top: 1px solid rgba(255,255,255,0.09);
+    }
+    #money { font-size: 27px; }
+    #hud { padding: 10px 12px; }
+    #panelHead { padding: 10px 12px 8px; }
+    #shop { padding: 7px; }
+    .item { padding: 9px 10px; margin-bottom: 6px; grid-template-columns: 34px 1fr auto; }
+    .chip { width: 34px; height: 34px; font-size: 17px; }
+    #panelFoot { padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  }
+  @media (max-height: 460px) and (max-width: 820px) {
+    #panel { flex-basis: 52%; max-height: 52%; }
+    #money { font-size: 22px; }
+  }
+
+  /* Touch devices: 44px tap targets, last so size queries cannot shrink them. */
+  @media (pointer: coarse) {
+    #backLink { min-height: 44px; padding: 10px 18px; font-size: 15px; }
+    .mode { min-height: 44px; font-size: 14px; }
+    .item { min-height: 56px; }
+    #prestigeBtn { min-height: 48px; }
+    #modalBtn { min-height: 48px; }
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="cityWrap">
+    <canvas id="city"></canvas>
+
+    <div id="hud">
+      <a id="backLink" href="/#/games" target="_top">&#8592; Arcade</a>
+      <div id="wallet">
+        <div id="money">§0</div>
+        <div id="rate">§0 / sec</div>
+        <div id="clock">Dawn</div>
+      </div>
+    </div>
+
+    <div id="tapHint">Drag to look around &middot; tap the city to collect</div>
+  </div>
+
+  <div id="panel">
+    <div id="panelHead">
+      <div id="panelTitle">City Planning</div>
+      <div id="buyModes">
+        <button class="mode" type="button" data-buy="1" aria-pressed="true">Buy ×1</button>
+        <button class="mode" type="button" data-buy="10" aria-pressed="false">Buy ×10</button>
+        <button class="mode" type="button" data-buy="max" aria-pressed="false">Buy Max</button>
+      </div>
+    </div>
+    <div id="shop"></div>
+    <div id="panelFoot">
+      <div id="legacyLine">
+        <span>Legacy <b id="legacyOwned">0</b> &middot; +<b id="legacyBonus">0%</b> income</span>
+        <span id="legacyGain">+0 next</span>
+      </div>
+      <button id="prestigeBtn" type="button" disabled>Urban Renewal</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="hidden">
+  <div id="modalCard">
+    <div id="modalTitle">Welcome <span>back</span></div>
+    <div id="modalAway">You were away for 0m</div>
+    <div id="modalAmount">§0</div>
+    <div id="modalNote">Your city kept working the whole time.</div>
+    <button id="modalBtn" type="button">Collect</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three/three.module.js",
+    "three/addons/": "/three/addons/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── DOM ──
+const cityWrap = document.getElementById('cityWrap');
+const canvas = document.getElementById('city');
+const moneyEl = document.getElementById('money');
+const rateEl = document.getElementById('rate');
+const clockEl = document.getElementById('clock');
+const shopEl = document.getElementById('shop');
+const buyModesEl = document.getElementById('buyModes');
+const legacyOwnedEl = document.getElementById('legacyOwned');
+const legacyBonusEl = document.getElementById('legacyBonus');
+const legacyGainEl = document.getElementById('legacyGain');
+const prestigeBtn = document.getElementById('prestigeBtn');
+const tapHintEl = document.getElementById('tapHint');
+const modalEl = document.getElementById('modal');
+const modalTitleEl = document.getElementById('modalTitle');
+const modalAwayEl = document.getElementById('modalAway');
+const modalAmountEl = document.getElementById('modalAmount');
+const modalNoteEl = document.getElementById('modalNote');
+const modalBtn = document.getElementById('modalBtn');
+
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+// ── Economy ──
+// Costs grow geometrically, so every tier eventually stalls and the next one
+// takes over — that hand-off is the whole progression.
+const COST_GROWTH = 1.15;
+const LEGACY_BONUS = 0.02;      // per legacy point
+const SAVE_KEY = 'idleMetropolisSave';
+const SAVE_VERSION = 1;
+
+const BUILDINGS = [
+  { id: 'tent',    name: 'Tent',        icon: '⛺', cost: 15,     income: 0.1,    h: 0.5,  w: 0.5, color: 0x9c8f7a },
+  { id: 'house',   name: 'House',       icon: '🏠', cost: 120,    income: 0.8,    h: 0.9,  w: 0.62, color: 0xc4907c },
+  { id: 'shop',    name: 'Corner Shop', icon: '🏪', cost: 1400,   income: 6,      h: 1.3,  w: 0.7, color: 0x62b6c9 },
+  { id: 'block',   name: 'Apartments',  icon: '🏢', cost: 17000,  income: 42,     h: 2.6,  w: 0.68, color: 0x8f8fd6 },
+  { id: 'office',  name: 'Offices',     icon: '🏬', cost: 210000, income: 260,    h: 3.8,  w: 0.72, color: 0x5f9ea0 },
+  { id: 'factory', name: 'Factory',     icon: '🏭', cost: 2.6e6,  income: 1700,   h: 2.2,  w: 0.86, color: 0xb08050 },
+  { id: 'tower',   name: 'Tower',       icon: '🗼', cost: 3.4e7,  income: 13000,  h: 6.5,  w: 0.6, color: 0xd08a6a },
+  { id: 'spire',   name: 'Skyscraper',  icon: '🌆', cost: 5.1e8,  income: 105000, h: 9.5,  w: 0.62, color: 0x6f86c9 },
+  { id: 'arc',     name: 'Arcology',    icon: '🛸', cost: 8.9e9,  income: 900000, h: 13,   w: 0.8, color: 0x7ad6b0 },
+];
+
+// ── State ──
+let money = 0;
+let totalEarned = 0;       // this run, drives the legacy payout
+let maxMoney = 0;          // ever held this run, drives tier reveals
+let counts = BUILDINGS.map(() => 0);
+let legacy = 0;
+let prestiges = 0;
+let buyMode = 1;           // 1 | 10 | 'max'
+let lastSeen = Date.now();
+
+const globalMult = () => 1 + LEGACY_BONUS * legacy;
+const incomePerSec = () => {
+  let sum = 0;
+  for (let i = 0; i < BUILDINGS.length; i++) sum += counts[i] * BUILDINGS[i].income;
+  return sum * globalMult();
+};
+
+// Cost of the nth copy (0-indexed) of a tier.
+const costOf = (tier, n) => BUILDINGS[tier].cost * Math.pow(COST_GROWTH, n);
+
+// Cost of buying `k` copies starting from the current count — a geometric series.
+function bulkCost(tier, k) {
+  const first = costOf(tier, counts[tier]);
+  if (k <= 0) return 0;
+  return first * (Math.pow(COST_GROWTH, k) - 1) / (COST_GROWTH - 1);
+}
+
+// Largest k affordable with `budget`, inverting the series above.
+function maxAffordable(tier, budget) {
+  const first = costOf(tier, counts[tier]);
+  if (budget < first) return 0;
+  const k = Math.log(1 + (budget * (COST_GROWTH - 1)) / first) / Math.log(COST_GROWTH);
+  return Math.max(0, Math.floor(k + 1e-9));
+}
+
+function buyQuantity(tier) {
+  if (buyMode === 'max') return maxAffordable(tier, money);
+  return buyMode;
+}
+
+// A tier appears once the player has been within reach of it, so the shop
+// reveals itself gradually instead of dumping nine rows on a new player.
+const REVEAL_FRACTION = 0.35;
+function isRevealed(tier) {
+  if (tier === 0) return true;
+  if (counts[tier] > 0) return true;
+  return maxMoney >= BUILDINGS[tier].cost * REVEAL_FRACTION;
+}
+
+function buy(tier) {
+  const k = buyQuantity(tier);
+  if (k <= 0) return 0;
+  const cost = bulkCost(tier, k);
+  if (cost > money) return 0;
+  money -= cost;
+  counts[tier] += k;
+  for (let i = 0; i < k; i++) placeBuilding(tier);
+  maybeRefit(false);
+  renderShop();
+  updateHud();
+  return k;
+}
+
+// ── Prestige ──
+// Legacy scales with the square root of lifetime earnings, so each reset is
+// worth doing but never trivialises the next run.
+const pendingLegacy = () => Math.floor(Math.sqrt(Math.max(0, totalEarned) / 1e6));
+
+function doPrestige() {
+  const gain = pendingLegacy();
+  if (gain < 1) return false;
+  legacy += gain;
+  prestiges += 1;
+  money = 0;
+  totalEarned = 0;
+  maxMoney = 0;
+  counts = BUILDINGS.map(() => 0);
+  rebuildCity();
+  renderShop();
+  updateHud();
+  save();
+  showModal('Urban', 'Renewal',
+    `Reset #${prestiges}`, '+' + formatNum(gain) + ' legacy',
+    `Every future run earns ${Math.round(LEGACY_BONUS * 100 * legacy)}% more.`);
+  return true;
+}
+
+// ── Number formatting ──
+const SUFFIX = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+function formatNum(n) {
+  if (!isFinite(n)) return '∞';
+  if (n < 0) return '-' + formatNum(-n);
+  if (n < 1000) return n < 10 && n % 1 !== 0 ? n.toFixed(1) : String(Math.floor(n));
+  let tier = Math.floor(Math.log10(n) / 3);
+  if (tier >= SUFFIX.length) tier = SUFFIX.length - 1;
+  const scaled = n / Math.pow(1000, tier);
+  const digits = scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
+  return scaled.toFixed(digits) + SUFFIX[tier];
+}
+
+function formatDuration(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
+// ── Save / load ──
+function save() {
+  lastSeen = Date.now();
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: SAVE_VERSION, money, totalEarned, maxMoney,
+      counts, legacy, prestiges, lastSeen,
+    }));
+  } catch (e) { /* storage blocked — the run just will not persist */ }
+}
+
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
+  if (!raw) return null;
+  let d;
+  try { d = JSON.parse(raw); } catch (e) { return null; }
+  if (!d || d.v !== SAVE_VERSION) return null;
+
+  const num = (v, fallback) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : fallback);
+  money = num(d.money, 0);
+  totalEarned = num(d.totalEarned, 0);
+  maxMoney = num(d.maxMoney, money);
+  legacy = num(d.legacy, 0);
+  prestiges = num(d.prestiges, 0);
+  counts = BUILDINGS.map((_, i) => {
+    const c = Array.isArray(d.counts) ? d.counts[i] : 0;
+    return typeof c === 'number' && isFinite(c) && c >= 0 ? Math.floor(c) : 0;
+  });
+  return num(d.lastSeen, Date.now());
+}
+
+// Offline earnings are deliberately uncapped: the whole appeal of an idle game
+// is that leaving is a strategy. The only guard is against a clock that moved
+// backwards, which would otherwise produce a negative payout.
+function applyOfflineEarnings(savedAt) {
+  if (!savedAt) return null;
+  const elapsedSec = (Date.now() - savedAt) / 1000;
+  if (!isFinite(elapsedSec) || elapsedSec <= 0) return null;
+  const earned = incomePerSec() * elapsedSec;
+  if (earned <= 0) return null;
+  money += earned;
+  totalEarned += earned;
+  maxMoney = Math.max(maxMoney, money);
+  return { elapsedSec, earned };
+}
+
+// ── City rendering ──
+const GRID = 13;                 // lots per side
+const LOT = 2.4;                 // world units per lot
+const MAX_BUILDINGS = GRID * GRID;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0a0d1e, 40, 110);
+
+const camera = new THREE.PerspectiveCamera(46, 1, 0.5, 400);
+camera.position.set(26, 20, 26);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.minDistance = 14;
+controls.maxDistance = 70;
+controls.minPolarAngle = 0.25;
+controls.maxPolarAngle = Math.PI / 2.35;   // never dip below the ground plane
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.45;
+controls.target.set(0, 2.5, 0);
+
+const hemi = new THREE.HemisphereLight(0x9fb6ff, 0x141024, 0.7);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff0dc, 1.5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 140;
+sun.shadow.camera.left = -28;
+sun.shadow.camera.right = 28;
+sun.shadow.camera.top = 28;
+sun.shadow.camera.bottom = -28;
+sun.shadow.bias = -0.0015;
+scene.add(sun);
+scene.add(sun.target);
+
+// Ground and streets.
+const groundSize = GRID * LOT + LOT * 2;
+const ground = new THREE.Mesh(
+  new THREE.BoxGeometry(groundSize, 1, groundSize),
+  new THREE.MeshStandardMaterial({ color: 0x2a2c3d, roughness: 0.95 })
+);
+ground.position.y = -0.5;
+ground.receiveShadow = true;
+scene.add(ground);
+
+(function addStreets() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x191b28, roughness: 1 });
+  const span = GRID * LOT;
+  for (let i = 0; i <= GRID; i++) {
+    const p = -span / 2 + i * LOT;
+    const road = new THREE.Mesh(new THREE.BoxGeometry(span + LOT, 0.06, LOT * 0.22), mat);
+    road.position.set(0, 0.03, p);
+    road.receiveShadow = true;
+    scene.add(road);
+    const road2 = new THREE.Mesh(new THREE.BoxGeometry(LOT * 0.22, 0.06, span + LOT), mat);
+    road2.position.set(p, 0.03, 0);
+    road2.receiveShadow = true;
+    scene.add(road2);
+  }
+})();
+
+// Two textures per tier, generated procedurally so no image assets ship:
+// a colour map (wall + dark glass) and an emissive map that is black except
+// for the windows that happen to be lit. Using the colour map as the emissive
+// map instead would make whole buildings glow rather than their windows.
+const TEX_W = 32, TEX_H = 64;
+function makeBuildingTextures(baseColor) {
+  const mapCanvas = document.createElement('canvas');
+  const emitCanvas = document.createElement('canvas');
+  mapCanvas.width = emitCanvas.width = TEX_W;
+  mapCanvas.height = emitCanvas.height = TEX_H;
+  const g = mapCanvas.getContext('2d');
+  const e = emitCanvas.getContext('2d');
+
+  const col = new THREE.Color(baseColor);
+  g.fillStyle = `rgb(${(col.r * 255) | 0}, ${(col.g * 255) | 0}, ${(col.b * 255) | 0})`;
+  g.fillRect(0, 0, TEX_W, TEX_H);
+  e.fillStyle = '#000';
+  e.fillRect(0, 0, TEX_W, TEX_H);
+
+  for (let y = 3; y < TEX_H - 4; y += 6) {
+    for (let x = 3; x < TEX_W - 3; x += 7) {
+      if (Math.random() < 0.18) continue;          // blank stretch of wall
+      const lit = Math.random() < 0.5;
+      g.fillStyle = lit ? '#39405c' : '#262b40';   // glass reads dark by day
+      g.fillRect(x, y, 4, 3);
+      if (lit) {
+        e.fillStyle = Math.random() < 0.25 ? '#fff0c8' : '#ffc274';
+        e.fillRect(x, y, 4, 3);
+      }
+    }
+  }
+
+  const mk = c => {
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    return t;
+  };
+  return { map: mk(mapCanvas), emissive: mk(emitCanvas) };
+}
+
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const tierMaterials = BUILDINGS.map(b => {
+  const tex = makeBuildingTextures(b.color);
+  return new THREE.MeshStandardMaterial({
+    map: tex.map, emissiveMap: tex.emissive, emissive: new THREE.Color(0xffffff),
+    emissiveIntensity: 0, roughness: 0.72, metalness: 0.04,
+  });
+});
+
+// Lots are filled from the middle outwards so the city grows as a blob rather
+// than filling one edge first.
+const lotOrder = (() => {
+  const lots = [];
+  const half = (GRID - 1) / 2;
+  for (let r = 0; r < GRID; r++) {
+    for (let c = 0; c < GRID; c++) {
+      lots.push({ r, c, d: Math.hypot(r - half, c - half) + Math.random() * 0.45 });
+    }
+  }
+  lots.sort((a, b) => a.d - b.d);
+  return lots;
+})();
+
+let placed = [];     // { mesh, tier, lotIndex, grow }
+let nextLot = 0;
+
+function lotPosition(i) {
+  const { r, c } = lotOrder[i];
+  const span = GRID * LOT;
+  return {
+    x: -span / 2 + LOT / 2 + c * LOT,
+    z: -span / 2 + LOT / 2 + r * LOT,
+  };
+}
+
+function makeMesh(tier, lotIndex) {
+  const b = BUILDINGS[tier];
+  const jitter = 0.85 + Math.random() * 0.3;
+  const height = b.h * jitter;
+  const mesh = new THREE.Mesh(unitBox, tierMaterials[tier]);
+  const p = lotPosition(lotIndex);
+  mesh.scale.set(LOT * b.w, height, LOT * b.w);
+  mesh.position.set(p.x, height / 2, p.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return { mesh, height };
+}
+
+// One purchase puts up one building. Once every lot is taken, the newest tier
+// replaces the humblest thing standing — so the skyline keeps improving instead
+// of freezing the moment the map is full.
+function placeBuilding(tier) {
+  if (nextLot < MAX_BUILDINGS) {
+    const lotIndex = nextLot++;
+    const { mesh, height } = makeMesh(tier, lotIndex);
+    placed.push({ mesh, tier, lotIndex, grow: 0, height });
+    return;
+  }
+  let worst = -1;
+  for (let i = 0; i < placed.length; i++) {
+    if (placed[i].tier < tier && (worst === -1 || placed[i].tier < placed[worst].tier)) worst = i;
+  }
+  if (worst === -1) return;                 // nothing humbler to replace
+  const old = placed[worst];
+  scene.remove(old.mesh);
+  const { mesh, height } = makeMesh(tier, old.lotIndex);
+  placed[worst] = { mesh, tier, lotIndex: old.lotIndex, grow: 0, height };
+}
+
+function rebuildCity() {
+  placed.forEach(p => scene.remove(p.mesh));
+  placed = [];
+  nextLot = 0;
+}
+
+// ── Camera framing ──
+// Frame the built-up area rather than the whole plot, so a first tent is not a
+// speck on an empty grid, and pull back as the city spreads. Narrow phone
+// viewports need the extra distance the horizontal fit asks for.
+let desiredDist = 30;
+let appliedDist = -1;
+let fitting = false;
+
+function updateDesiredDistance() {
+  const side = Math.sqrt(Math.max(4, placed.length));
+  const radius = Math.max(LOT * 2.4, (side / 2 + 1.3) * LOT);
+  const tanV = Math.tan((camera.fov * Math.PI) / 180 / 2);
+  const aspect = Math.max(0.2, camera.aspect || 1);
+  desiredDist = Math.max(radius / tanV, radius / (tanV * aspect)) * 0.92;
+  controls.minDistance = Math.max(6, desiredDist * 0.4);
+  controls.maxDistance = desiredDist * 2.4;
+}
+
+// Only re-frame when the city has meaningfully changed size, so a player who
+// zoomed in by hand is not fought over every purchase.
+function maybeRefit(snap) {
+  updateDesiredDistance();
+  const changed = appliedDist < 0 || Math.abs(desiredDist - appliedDist) / appliedDist > 0.18;
+  if (!changed) return;
+  appliedDist = desiredDist;
+  if (snap) {
+    const dir = camera.position.clone().sub(controls.target).normalize();
+    camera.position.copy(controls.target).add(dir.multiplyScalar(desiredDist));
+    fitting = false;
+  } else {
+    fitting = true;
+  }
+}
+
+function stepFit(dt) {
+  if (!fitting) return;
+  const offset = camera.position.clone().sub(controls.target);
+  const d = offset.length();
+  if (Math.abs(d - desiredDist) < 0.15) { fitting = false; return; }
+  const next = d + (desiredDist - d) * Math.min(1, dt * 1.6);
+  camera.position.copy(controls.target).add(offset.normalize().multiplyScalar(next));
+}
+
+// Rebuild the skyline from saved counts without animating hundreds of pop-ins.
+function syncCityToCounts() {
+  rebuildCity();
+  const order = [];
+  for (let t = BUILDINGS.length - 1; t >= 0; t--) {
+    for (let i = 0; i < counts[t] && order.length < MAX_BUILDINGS; i++) order.push(t);
+  }
+  order.forEach(t => placeBuilding(t));
+  placed.forEach(p => { p.grow = 1; p.mesh.scale.y = p.height; p.mesh.position.y = p.height / 2; });
+  maybeRefit(true);
+}
+
+// ── Day / night ──
+const DAY_SECONDS = 90;
+let timeOfDay = 0.28;            // 0..1, 0 = midnight
+const SKY_DAY = new THREE.Color(0x7fa6d8);
+const SKY_DUSK = new THREE.Color(0x2d2547);
+const SKY_NIGHT = new THREE.Color(0x070a18);
+
+function updateDayNight(dt) {
+  timeOfDay = (timeOfDay + dt / DAY_SECONDS) % 1;
+  const angle = timeOfDay * Math.PI * 2 - Math.PI / 2;
+  const sunHeight = Math.sin(angle);
+
+  sun.position.set(Math.cos(angle) * 40, Math.max(-10, sunHeight * 45), 18);
+  sun.intensity = Math.max(0, sunHeight) * 1.7;
+  // Enough ambient at night to keep the silhouettes readable behind the glow.
+  hemi.intensity = 0.34 + Math.max(0, sunHeight) * 0.55;
+
+  const daylight = Math.max(0, Math.min(1, sunHeight * 1.6 + 0.35));
+  const sky = SKY_NIGHT.clone();
+  if (daylight > 0.5) sky.copy(SKY_DUSK).lerp(SKY_DAY, (daylight - 0.5) * 2);
+  else sky.copy(SKY_NIGHT).lerp(SKY_DUSK, daylight * 2);
+  scene.background = sky;
+  scene.fog.color.copy(sky);
+
+  // Windows come on as the light goes.
+  const litness = 1 - daylight;
+  tierMaterials.forEach(m => { m.emissiveIntensity = litness * 0.95; });
+
+  clockEl.textContent =
+    daylight > 0.75 ? 'Midday' : daylight > 0.45 ? 'Afternoon'
+    : daylight > 0.18 ? 'Dusk' : 'Night';
+}
+
+// ── Tap the city to collect ──
+// A small manual trickle so the first minute is not pure waiting. Worth a few
+// seconds of income, never enough to replace building.
+let pointerDownAt = 0, pointerDownX = 0, pointerDownY = 0;
+
+cityWrap.addEventListener('pointerdown', e => {
+  if (e.target.closest('a, button')) return;
+  pointerDownAt = performance.now();
+  pointerDownX = e.clientX;
+  pointerDownY = e.clientY;
+});
+
+cityWrap.addEventListener('pointerup', e => {
+  if (e.target.closest('a, button')) return;
+  const moved = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
+  const held = performance.now() - pointerDownAt;
+  // Anything with drag in it belongs to OrbitControls, not to collecting.
+  if (moved > 8 || held > 400 || pointerDownAt === 0) return;
+  const gain = Math.max(1, incomePerSec() * 2);
+  money += gain;
+  totalEarned += gain;
+  maxMoney = Math.max(maxMoney, money);
+  spawnPop(e.clientX, e.clientY, '+§' + formatNum(gain));
+  tapHintEl.classList.add('gone');
+  updateHud();
+});
+
+function spawnPop(clientX, clientY, text) {
+  const rect = cityWrap.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'pop';
+  el.textContent = text;
+  el.style.left = (clientX - rect.left) + 'px';
+  el.style.top = (clientY - rect.top - 10) + 'px';
+  cityWrap.appendChild(el);
+  setTimeout(() => el.remove(), 950);
+}
+
+// ── UI ──
+const rows = [];
+
+function buildShop() {
+  shopEl.textContent = '';
+  rows.length = 0;
+  BUILDINGS.forEach((b, tier) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'item';
+    btn.dataset.tier = String(tier);
+
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.textContent = b.icon;
+
+    const mid = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'item-name';
+    const sub = document.createElement('div');
+    sub.className = 'item-sub';
+    mid.appendChild(name);
+    mid.appendChild(sub);
+
+    const right = document.createElement('div');
+    right.className = 'item-right';
+    const cost = document.createElement('div');
+    cost.className = 'item-cost';
+    const owned = document.createElement('div');
+    owned.className = 'item-owned';
+    right.appendChild(cost);
+    right.appendChild(owned);
+
+    btn.appendChild(chip);
+    btn.appendChild(mid);
+    btn.appendChild(right);
+    btn.addEventListener('click', () => buy(tier));
+    shopEl.appendChild(btn);
+    rows.push({ btn, name, sub, cost, owned, chip });
+  });
+}
+
+function renderShop() {
+  BUILDINGS.forEach((b, tier) => {
+    const row = rows[tier];
+    const revealed = isRevealed(tier);
+    row.btn.style.display = revealed ? '' : 'none';
+    if (!revealed) return;
+
+    const k = Math.max(1, buyQuantity(tier));
+    const price = bulkCost(tier, k);
+    const affordable = buyQuantity(tier) > 0 && price <= money;
+
+    row.name.textContent = b.name;
+    row.sub.textContent = `§${formatNum(b.income * globalMult())}/sec each`;
+    row.cost.textContent = '§' + formatNum(price) + (k > 1 ? ` ×${k}` : '');
+    row.owned.textContent = counts[tier] > 0 ? `owned ${formatNum(counts[tier])}` : '';
+    row.btn.disabled = !affordable;
+    row.btn.classList.toggle('affordable', affordable);
+  });
+}
+
+function updateHud() {
+  moneyEl.textContent = '§' + formatNum(money);
+  rateEl.textContent = '§' + formatNum(incomePerSec()) + ' / sec';
+  const gain = pendingLegacy();
+  legacyOwnedEl.textContent = formatNum(legacy);
+  legacyBonusEl.textContent = Math.round(LEGACY_BONUS * 100 * legacy) + '%';
+  legacyGainEl.textContent = '+' + formatNum(gain) + ' next';
+  prestigeBtn.disabled = gain < 1;
+  prestigeBtn.textContent = gain >= 1 ? `Urban Renewal (+${formatNum(gain)})` : 'Urban Renewal';
+}
+
+buyModesEl.addEventListener('click', e => {
+  const btn = e.target.closest('.mode');
+  if (!btn) return;
+  buyMode = btn.dataset.buy === 'max' ? 'max' : Number(btn.dataset.buy);
+  buyModesEl.querySelectorAll('.mode').forEach(b => {
+    b.setAttribute('aria-pressed', String(b === btn));
+  });
+  renderShop();
+});
+
+prestigeBtn.addEventListener('click', doPrestige);
+
+// Built from DOM nodes rather than markup, so no string here can ever become
+// an injection point.
+function showModal(lead, accentWord, away, amount, note) {
+  modalTitleEl.textContent = lead + ' ';
+  const accent = document.createElement('span');
+  accent.textContent = accentWord;
+  modalTitleEl.appendChild(accent);
+  modalAwayEl.textContent = away;
+  modalAmountEl.textContent = amount;
+  modalNoteEl.textContent = note;
+  modalEl.classList.remove('hidden');
+}
+modalBtn.addEventListener('click', () => modalEl.classList.add('hidden'));
+
+// ── Resize ──
+function resize() {
+  const w = Math.max(1, cityWrap.clientWidth);
+  const h = Math.max(1, cityWrap.clientHeight);
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  // An orientation change is a big enough shift to justify re-framing.
+  appliedDist = -1;
+  maybeRefit(true);
+}
+window.addEventListener('resize', resize);
+
+// ── Main loop ──
+const clock = new THREE.Clock();
+let sinceSave = 0;
+let sinceUi = 0;
+
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.25);
+
+  const earned = incomePerSec() * dt;
+  if (earned > 0) {
+    money += earned;
+    totalEarned += earned;
+    if (money > maxMoney) maxMoney = money;
+  }
+
+  // Buildings rise into place rather than popping in.
+  for (let i = 0; i < placed.length; i++) {
+    const p = placed[i];
+    if (p.grow < 1) {
+      p.grow = Math.min(1, p.grow + dt * 2.2);
+      const eased = 1 - Math.pow(1 - p.grow, 3);
+      p.mesh.scale.y = Math.max(0.001, p.height * eased);
+      p.mesh.position.y = (p.height * eased) / 2;
+    }
+  }
+
+  updateDayNight(dt);
+  stepFit(dt);
+  controls.update();
+  renderer.render(scene, camera);
+
+  // The panel is a few dozen DOM writes; at 60fps that is pure layout churn for
+  // numbers nobody can read that fast.
+  sinceUi += dt;
+  if (sinceUi > 0.1) { sinceUi = 0; updateHud(); renderShop(); }
+
+  sinceSave += dt;
+  if (sinceSave > 5) { sinceSave = 0; save(); }
+}
+
+// ── Init ──
+const savedAt = load();
+buildShop();
+syncCityToCounts();
+resize();
+updateHud();
+renderShop();
+
+const offline = applyOfflineEarnings(savedAt);
+if (offline && offline.elapsedSec > 30) {
+  showModal('Welcome', 'back',
+    'You were away for ' + formatDuration(offline.elapsedSec),
+    '+§' + formatNum(offline.earned),
+    'Your city kept working the whole time — no cap, no catch.');
+}
+if (isTouch) tapHintEl.textContent = 'Drag to look around · tap the city to collect';
+
+window.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+window.addEventListener('pagehide', save);
+window.addEventListener('beforeunload', save);
+
+frame();
+</script>
+</body>
+</html>
