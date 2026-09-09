@@ -1,232 +1,112 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none';">
-  <meta name="theme-color" content="#0f0f23">
-  <meta name="description"
-        content="Privacy policy for Helkost, an iOS app with no server, no account and no analytics.">
-  <link rel="icon" href="/favicon.ico">
-  <title>Helkost — Privacy Policy</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --fg: #f2f4f8;
-      --muted: #a6aec4;
-      --soft: #ccd3e2;
-      --accent: #00d4ff;
-      --rule: rgba(255, 255, 255, 0.1);
-    }
-
-    * { box-sizing: border-box; }
-
-    html { -webkit-text-size-adjust: 100%; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-      background-attachment: fixed;
-      color: var(--fg);
-      font: 400 17px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    .wrap { max-width: 44rem; margin: 0 auto; padding: 4rem 1.35rem 3rem; }
-
-    .eyebrow {
-      margin: 0 0 0.7rem;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--accent);
-    }
-
-    h1 {
-      margin: 0 0 0.5rem;
-      font-size: clamp(1.9rem, 6vw, 2.5rem);
-      font-weight: 800;
-      line-height: 1.12;
-      letter-spacing: -0.02em;
-    }
-
-    .updated { margin: 0 0 2.5rem; color: var(--muted); font-size: 1.02rem; }
-
-    h2 {
-      margin: 2.9rem 0 0.9rem;
-      padding-top: 1.7rem;
-      border-top: 1px solid var(--rule);
-      font-size: 1.16rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-    }
-
-    p, li { margin: 0 0 1.1rem; }
-    ul { margin: 0 0 1.1rem; padding-left: 1.2rem; }
-    li { margin-bottom: 0.5rem; }
-
-    a {
-      color: var(--accent);
-      text-decoration: underline;
-      text-underline-offset: 0.18em;
-      text-decoration-thickness: 1px;
-    }
-
-    a:hover { text-decoration-thickness: 2px; }
-
-    strong { font-weight: 600; color: #fff; }
-
-    footer {
-      margin-top: 3.2rem;
-      padding-top: 1.6rem;
-      border-top: 1px solid var(--rule);
-      color: var(--muted);
-      font-size: 0.92rem;
-    }
-
-    footer p { margin: 0 0 0.5rem; }
-
-    @media (max-width: 480px) {
-      body { font-size: 16px; }
-      .wrap { padding: 2.75rem 1.15rem 2.5rem; }
-    }
-
-    @media print {
-      body { background: #fff; color: #000; }
-      .wrap { max-width: none; padding: 0; }
-      .eyebrow, a { color: #000; }
-      h2, footer { border-color: #ccc; }
-      .updated, footer { color: #333; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helkost — Privacy Policy</title>
+<style>
+  :root { color-scheme: light dark; --fg: #1a1a1a; --muted: #5c5c5c; --bg: #fff; --rule: #e3e3e3; --link: #1b6b3a; --th: #f6f6f6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #ececec; --muted: #a0a0a0; --bg: #141414; --rule: #2c2c2c; --link: #6cc48d; --th: #1e1e1e; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; padding: 3rem 1.25rem 5rem; max-width: 42rem;
+    font: 400 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color: var(--fg); background: var(--bg);
+    -webkit-text-size-adjust: 100%;
+  }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 .35rem; letter-spacing: -.02em; }
+  h2 { font-size: 1.2rem; margin: 2.5rem 0 .6rem; letter-spacing: -.01em; }
+  h3 { font-size: 1.02rem; margin: 1.8rem 0 .5rem; }
+  .updated { color: var(--muted); font-size: .95rem; margin: 0 0 2.5rem; }
+  p, li { margin: 0 0 1rem; }
+  ul { padding-left: 1.25rem; }
+  a { color: var(--link); }
+  strong { font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 3rem 0 1.5rem; }
+  .tablewrap { overflow-x: auto; margin: 0 0 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .94rem; }
+  th, td { border: 1px solid var(--rule); padding: .5rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--th); font-weight: 600; }
+  footer { color: var(--muted); font-size: .9rem; }
+</style>
 </head>
-
 <body>
-  <main class="wrap">
 
-    <p class="eyebrow">Helkost</p>
-    <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: 6 August 2026</p>
+<h1>Helkost — Privacy Policy</h1>
+<p class="updated">Last updated: 8 September 2026</p>
+<p>Helkost keeps as little about you as a working app can. Your food diary, your scans and your recipes live on your iPhone and in your own iCloud. There is no sign-up, no email address, no password and no profile.</p>
+<p>The AI features do need a server, because the model has to be paid for by somebody. That server is described in full below. It never learns your name, your email, your diary or your device.</p>
+<h2>What Helkost stores, and where</h2>
+<p><strong>On your device.</strong> The product database ships inside the app — 1,135,564 products, read-only. Your language, daily energy target and body details are kept in the app's own settings.</p>
+<p><strong>In your iCloud, not ours.</strong> These sync through CloudKit to your private iCloud database:</p>
+<ul>
+  <li>your food diary and the portions you log</li>
+  <li>your scan history</li>
+  <li>saved recipes, and the meal plan you build from them</li>
+  <li>your shopping list</li>
+  <li>the prices you record for products</li>
+  <li>the ingredient labels you have read with the camera</li>
+  <li>your cooking chat</li>
+</ul>
+<p>That is your Apple account, governed by <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a>. Nobody else can read it, and neither can the developer of this app.</p>
+<p><strong>In Apple Health, if you allow it.</strong> With your permission Helkost reads the energy you have burned, so the daily target reflects how active you have been, and writes what you log so your food appears alongside everything else. Health data is exchanged with HealthKit on the device. It is never sent to our server, never used for advertising, and never shared with anyone.</p>
+<h2>The AI features and the Helkost server</h2>
+<p>Turning on an AI feature creates an account on our server. It is worth being precise about what that account is.</p>
+<p><strong>It is a random number.</strong> When the app first uses an AI feature it asks the server for an identifier — a UUID, generated at random, belonging to nothing. Your Apple ID is not involved. Your email address is not involved. Your device's identifiers are not involved. Nothing about that number can be traced back to you by us, by Apple, or by anybody who obtained a copy of our database.</p>
+<p><strong>What the server keeps, in its entirety:</strong></p>
+<div class="tablewrap"><table>
+<tr><th>What</th><th>Why</th><th>How long</th></tr>
+<tr><td>The random identifier</td><td>To count your daily usage against your allowance</td><td>Until you delete it, or 400 days after your last use</td></tr>
+<tr><td>A public key from your iPhone's Secure Enclave, and a counter</td><td>To prove requests come from a real iPhone running the real app, so somebody cannot script the free tier and run up the bill</td><td>Same</td></tr>
+<tr><td>The date you first used it, and the date you last used it</td><td>To delete dormant accounts automatically</td><td>Same</td></tr>
+<tr><td>A count of how many times you used each feature each day</td><td>To enforce the daily limits</td><td>60 days</td></tr>
+<tr><td>Whether you have a subscription, and when it expires</td><td>To know whether to serve the paid features</td><td>While the subscription exists</td></tr>
+</table></div>
+<p>That is the complete list. There is no column in that database for a name, an email address, an IP address, a device identifier, or anything you have ever typed. The public key is a public key: it verifies signatures and can decrypt nothing.</p>
+<p><strong>What the server does not keep.</strong> Your questions and the answers to them are not stored against your account. They are relayed, answered, and forgotten. The server keeps no request log tying a person to a question — the reverse proxy in front of it is configured to discard the client IP address and the authorisation header before anything is written to disk.</p>
+<p><strong>The shared answer cache.</strong> Some answers do not depend on who asked. The verdict on a tin of chopped tomatoes is the same for everybody, so it is computed once and reused. Those answers are stored, but the row contains only the product and the text — no account identifier, and no way to tell who caused it to be written or who has read it since. Personal requests — your calorie target, your cooking chat, your meal photos — are never cached.</p>
+<p><strong>What is sent onward.</strong> Your question, and only your question, goes to <a href="https://openai.com/policies/privacy-policy">OpenAI</a> through our account. Your identifier does not go with it. OpenAI's API terms state that data submitted through the API is not used to train their models.</p>
+<p><strong>Meal photos.</strong> A photo you send for a calorie estimate is passed to OpenAI and discarded. It is never written to our disks, never cached, and never associated with your identifier.</p>
+<p><strong>Your calorie target.</strong> If you ask for an AI estimate, the details you have entered — sex, age, height, weight, activity, goal — are relayed for that one request and forgotten. They are not stored on the server and not cached. They remain, as before, on your device and in your iCloud.</p>
+<h2>Subscriptions</h2>
+<p>Helkost Plus is sold through Apple's In-App Purchase. <strong>Apple handles the payment; we never see it.</strong> We do not receive your card details, your billing address, your name, or your Apple ID. What we receive from Apple is a signed receipt containing a transaction identifier, which we store against your random number so we know the subscription is live.</p>
+<p>Apple also tells our server when a subscription renews, lapses or is refunded, so the app stops offering paid features at the right moment. Those messages are identified by transaction number and contain nothing about you.</p>
+<p>Managing or cancelling a subscription is done in <strong>Settings → [your name] → Subscriptions</strong> on your iPhone, not in this app.</p>
+<h2>Barcode lookups</h2>
+<p>When you scan a product the app does not carry, Helkost asks <a href="https://world.openfoodfacts.org">Open Food Facts</a> about that barcode. The barcode is all that is sent — no identifier, nothing about you, nothing about your diary. Helkost only ever reads from Open Food Facts; nothing you write is ever sent there.</p>
+<h2>Camera and photos</h2>
+<p>The camera is used to scan barcodes and to read ingredient labels. Photographs of meals are yours to pick from your photo library or take with the camera; the picture is kept with your diary entry. Helkost does not have access to the rest of your photo library — iOS shows you its own picker and hands over only the image you choose.</p>
+<h2>What Helkost does not do</h2>
+<ul>
+  <li>No sign-up, no email address, no password, no profile.</li>
+  <li>No analytics, no crash reporting, no advertising, no third-party SDKs.</li>
+  <li>No tracking of any kind, and no data shared with data brokers.</li>
+  <li>No selling of anything to anyone.</li>
+  <li>No log that ties a person to a question.</li>
+</ul>
+<h2>Children</h2>
+<p>Helkost is not directed at children and collects nothing that would identify anyone, at any age.</p>
+<h2>Your rights, and how to use them</h2>
+<p>Because the account is a random number that we cannot connect to you, we cannot answer a request about "your data" from an email address — we would have no way to find it, and no way to know it was yours. Everything is therefore done from inside the app, where your phone holds the only proof of ownership there is:</p>
+<ul>
+  <li><strong>See what is held about you:</strong> More → AI → *Account* shows the identifier, today's usage counts, and your subscription status. That is everything.</li>
+  <li><strong>Delete it:</strong> the same screen has *Delete account and data*. It erases the identifier, the key, the counters and the subscription record immediately and permanently. This is not a request queued for review; the row is gone.</li>
+  <li><strong>Take it with you:</strong> the same screen exports it as a file. It is a small file, because there is very little to export.</li>
+  <li><strong>Stop entirely:</strong> deleting the app removes everything on the device. Your server account then deletes itself after 400 days of not being used. To remove the iCloud copy, use <strong>Settings → [your name] → iCloud → Manage Account Storage → Helkost</strong>.</li>
+</ul>
+<p>Under the GDPR the developer is the data controller for the random identifier and the counters described above. The lawful basis is the performance of the contract you enter into by using the app — providing the feature, and enforcing the allowance that makes it affordable. The server and its database are hosted in Germany by Hetzner Online GmbH, inside the EU. OpenAI processes requests under their API terms; that transfer relies on their Data Processing Addendum and standard contractual clauses.</p>
+<p>If you believe your data has been mishandled you may complain to your national supervisory authority — in Sweden, Integritetsskyddsmyndigheten (IMY).</p>
+<h2>Not medical advice</h2>
+<p>Helkost describes how processed a food is, using the NOVA classification, and shows nutrition figures published by Open Food Facts. NOVA describes processing, <strong>not</strong> healthiness. Calorie estimates from a photograph are estimates, and the app shows them as a range with its assumptions visible for that reason. Nothing in the app is medical or dietary advice. Talk to a doctor or a dietitian about anything that matters to your health.</p>
+<h2>Contact</h2>
+<p>Questions about this policy: <strong>gertian.mici@gmail.com</strong></p>
+<h2>Changes</h2>
+<p>If this policy changes, the date at the top changes with it. If a change ever means the app collects something it did not collect before, that will be said plainly here and in the app before it takes effect.</p>
 
-    <p>Helkost has no server, no account, and no analytics. Everything it knows
-    lives on your iPhone or in your own iCloud.</p>
+<hr>
+<footer>Helkost · gertian.mici@gmail.com</footer>
 
-    <h2>What Helkost stores, and where</h2>
-
-    <p><strong>On your device.</strong> The product database ships inside the
-    app — 1,135,564 products, read-only. Your language, daily energy target and
-    body details are kept in the app's own settings.</p>
-
-    <p><strong>In your iCloud, not ours.</strong> These sync through CloudKit to
-    your private iCloud database:</p>
-
-    <ul>
-      <li>your food diary and the portions you log</li>
-      <li>your scan history</li>
-      <li>saved recipes, and the meal plan you build from them</li>
-      <li>your shopping list</li>
-      <li>the prices you record for products</li>
-      <li>the ingredient labels you have read with the camera</li>
-      <li>your cooking chat</li>
-    </ul>
-
-    <p>That is your Apple account, governed by
-    <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a>.
-    Nobody else can read it, and neither can the developer of this app.</p>
-
-    <p><strong>In the iOS Keychain.</strong> One credential, and only if you
-    choose to use the feature that needs it: your own OpenAI API key. It is
-    stored on that device only, excluded from backups, and deletable from inside
-    the app.</p>
-
-    <p><strong>In Apple Health, if you allow it.</strong> With your permission
-    Helkost reads the energy you have burned, so the daily target reflects how
-    active you have been, and writes what you log so your food appears alongside
-    everything else. Health data is exchanged with HealthKit on the device. It
-    is never sent anywhere, and it is never used for advertising or shared with
-    anyone.</p>
-
-    <h2>What leaves your device</h2>
-
-    <p>Two things, both only when you ask for them.</p>
-
-    <p><strong>Barcode lookups.</strong> When you scan a product the app does
-    not carry, Helkost asks <a href="https://world.openfoodfacts.org">Open Food
-    Facts</a> about that barcode. The barcode is all that is sent — no
-    identifier, nothing about you, nothing about your diary. Helkost only ever
-    reads from Open Food Facts; nothing you write is ever sent there.</p>
-
-    <p><strong>The AI features, if you turn them on.</strong> They are off until
-    you enter your own OpenAI API key, which is stored in the iOS Keychain on
-    that device only, excluded from backups, and never transmitted anywhere
-    except to OpenAI. When you ask a question, only the product or recipe text
-    the question is about is sent, billed to your own OpenAI account. Nothing
-    about you, your diary or your history goes with it. See
-    <a href="https://openai.com/policies/privacy-policy">OpenAI's privacy
-    policy</a>. Deleting the key in <strong>More → AI</strong> stops all of
-    it.</p>
-
-    <h2>Camera and photos</h2>
-
-    <p>The camera is used to scan barcodes and to read ingredient labels.
-    Photographs of meals are yours to pick from your photo library or take with
-    the camera; the picture is analysed and kept with your diary entry. Helkost
-    does not have access to the rest of your photo library — iOS shows you its
-    own picker and hands over only the image you choose.</p>
-
-    <p>A meal photo is analysed for a calorie estimate only if you have turned
-    on the AI features with your own key, in which case that image goes to
-    OpenAI and nowhere else. Otherwise it stays on your device and in your
-    iCloud.</p>
-
-    <h2>What Helkost does not do</h2>
-
-    <ul>
-      <li>No accounts, no sign-up, no email address. The OpenAI key above is
-          optional, is yours, and is billed to your own account with them.</li>
-      <li>No analytics, no crash reporting, no advertising, no third-party SDKs.</li>
-      <li>No tracking of any kind, and no data shared with data brokers.</li>
-      <li>No selling of anything to anyone.</li>
-    </ul>
-
-    <!-- When paid features ship, the payments section goes here as a new
-         <h2> + <p> block, and the "Last updated" date above changes with it. -->
-
-    <h2>Children</h2>
-
-    <p>Helkost collects nothing from anyone, at any age.</p>
-
-    <h2>Deleting your data</h2>
-
-    <p>Deleting the app removes everything on the device. To remove the synced
-    copy, open <strong>Settings → [your name] → iCloud → Manage Account Storage
-    → Helkost</strong> and delete the data there.</p>
-
-
-    <h2>Not medical advice</h2>
-
-    <p>Helkost describes how processed a food is, using the NOVA classification,
-    and shows nutrition figures published by Open Food Facts. NOVA describes
-    processing, <strong>not</strong> healthiness. Calorie estimates from a
-    photograph are estimates, and the app shows them as a range with its
-    assumptions visible for that reason. Nothing in the app is medical or
-    dietary advice. Talk to a doctor or a dietitian about anything that matters
-    to your health.</p>
-
-    <h2>Contact</h2>
-
-    <p>Questions about this policy:
-    <a href="mailto:gertian.mici@gmail.com">gertian.mici@gmail.com</a></p>
-
-    <footer>
-      <p>If this policy changes, the date at the top changes with it.</p>
-      <p><a href="/helkost/support/">Helkost support</a> · <a href="/helkost/">All Helkost documents</a></p>
-    </footer>
-
-  </main>
 </body>
-
 </html>
