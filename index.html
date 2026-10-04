@@ -3,32 +3,50 @@
 
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="/favicon.ico" />
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/logo192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com;" />
-  <meta name="theme-color" content="#000000" />
-  <meta name="description" content="Gertian Mici — Senior Backend &amp; AI Engineer. .NET and distributed systems for consumer fintech: card issuing, ledgers, settlement and payments. Production LLM tooling and autonomous agent harnesses." />
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self';" />
+  <meta name="theme-color" content="#09090b" />
+  <meta name="color-scheme" content="dark light" />
+  <script>
+    // Set the theme before first paint so the page never flashes the wrong one:
+    // the visitor's saved choice if there is one, otherwise their system setting.
+    (function () {
+      var theme;
+      try { theme = localStorage.getItem("theme"); } catch (e) {}
+      if (theme !== "light" && theme !== "dark") {
+        theme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+      document.documentElement.setAttribute("data-theme", theme);
+      document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "light" ? "#fbfbfc" : "#09090b");
+    })();
+  </script>
+  <meta name="description" content="Gertian Mici — Senior Software Engineer in Stockholm. Services, data layers and cloud platforms across core banking, navigation and enterprise software." />
   <meta name="author" content="Gertian Mici" />
   <link rel="canonical" href="https://gertianmici.com/" />
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Gertian Mici" />
-  <meta property="og:title" content="Gertian Mici | Senior Backend &amp; AI Engineer" />
-  <meta property="og:description" content=".NET and distributed systems for consumer fintech — card issuing, ledgers, settlement and payments — plus production LLM tooling and autonomous agent harnesses." />
+  <meta property="og:title" content="Gertian Mici | Senior Software Engineer" />
+  <meta property="og:description" content="Reliable software end to end: services, data layers and cloud platforms across core banking, navigation and enterprise software." />
   <meta property="og:url" content="https://gertianmici.com/" />
-  <meta property="og:image" content="https://gertianmici.com/logo512.png" />
+  <meta property="og:image" content="https://gertianmici.com/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Gertian Mici, Senior Software Engineer" />
 
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Gertian Mici | Senior Backend &amp; AI Engineer" />
-  <meta name="twitter:description" content=".NET and distributed systems for consumer fintech, plus production LLM tooling and autonomous agent harnesses." />
-  <meta name="twitter:image" content="https://gertianmici.com/logo512.png" />
-  <link rel="apple-touch-icon" href="/logo192.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Gertian Mici | Senior Software Engineer" />
+  <meta name="twitter:description" content="Reliable software end to end, from distributed backends to the products people use." />
+  <meta name="twitter:image" content="https://gertianmici.com/og-image.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
   <link rel="manifest" href="/manifest.json" />
-  <title>Gertian Mici | Senior Backend &amp; AI Engineer</title>
-  <script type="module" crossorigin src="/assets/index-DYDq0yXP.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DlwVlzql.css">
+  <title>Gertian Mici | Senior Software Engineer</title>
+  <script type="module" crossorigin src="/assets/index-DCi98MAa.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DwGsIU5C.css">
 </head>
 
 <body>
