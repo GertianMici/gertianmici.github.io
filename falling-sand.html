@@ -196,6 +196,7 @@
 
     <div id="topBar">
       <a id="backLink" href="/#/games" target="_top">&#8592; Arcade</a>
+<script>/* Inside the portfolio the page bar already links back to the games. */ if (window.self !== window.top) document.getElementById("backLink").remove();</script>
       <div id="stats">
         <div id="fpsLine">60 FPS</div>
         <div id="cellLine">0 particles</div>
